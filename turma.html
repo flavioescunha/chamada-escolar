@@ -193,10 +193,10 @@
 
     async function carregarProfessor() {
       const { data, error } = await supabase
-        .from("professores")
-        .select("id, nome, email, disciplina")
-        .eq("id", usuarioAtual.id)
-        .single();
+      .from("professores")
+      .select("id, nome, email, disciplina, exigir_troca_senha")
+      .eq("id", usuarioAtual.id)
+      .single();
 
       if (error) {
         alert("Professor não encontrado.");
@@ -204,9 +204,17 @@
         return false;
       }
 
+      
       professorAtual = data;
+
+      if (data.exigir_troca_senha === true) {
+        window.location.href = "trocar-senha.html";
+        return false;
+      }
+
       infoProfessor.innerText = `Professor: ${data.nome} | Disciplina: ${data.disciplina || ""}`;
       return true;
+
     }
 
     async function carregarTurma() {

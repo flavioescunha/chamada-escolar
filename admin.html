@@ -86,6 +86,11 @@
       border: 1px solid #e8a3a3;
     }
 
+    .btn-senha {
+      background: #fff8e8;
+      border: 1px solid #e2c06c;
+    }
+
     .badge {
       display: inline-block;
       padding: 4px 8px;
@@ -240,7 +245,7 @@
 
       const { data: prof, error: profError } = await supabase
         .from("professores")
-        .select("id, nome, email, status, is_admin")
+        .select("id, nome, email, status, is_admin, exigir_troca_senha")
         .eq("id", usuarioAtual.id)
         .maybeSingle();
 
@@ -254,7 +259,18 @@
         return false;
       }
 
-      if (!prof || prof.status !== "aprovado" || prof.is_admin !== true) {
+      if (!prof) {
+        alert("Perfil do professor não encontrado.");
+        window.location.href = "index.html";
+        return false;
+      }
+
+      if (prof.exigir_troca_senha === true) {
+        window.location.href = "trocar-senha.html";
+        return false;
+      }
+
+      if (prof.status !== "aprovado" || prof.is_admin !== true) {
         alert("Acesso restrito à administração.");
         window.location.href = "turmas.html";
         return false;
@@ -263,6 +279,7 @@
       professorAtual = prof;
       infoAdmin.innerText = `Administrador: ${prof.nome} | ${prof.email}`;
       return true;
+
     }
 
     async function carregarPendentes() {
@@ -370,11 +387,15 @@
                 ? `<button class="btn-admin" data-id="${prof.id}" data-acao="remover" ${souEu ? "disabled" : ""}>Remover Admin</button>`
                 : `<button class="btn-admin" data-id="${prof.id}" data-acao="promover">Tornar Admin</button>`
             }
+            <button class="btn-senha btnSenhaTemporaria" data-id="${prof.id}" data-nome="${prof.nome}" ${souEu ? "disabled" : ""}>
+              Senha temporária
+            </button>
             <button class="btn-excluir btnExcluirProfessor" data-id="${prof.id}" data-nome="${prof.nome}" ${souEu ? "disabled" : ""}>
               Excluir
             </button>
           </div>
         `;
+
 
         listaAprovados.appendChild(div);
       });
@@ -392,9 +413,9 @@
         });
       });
 
-      document.querySelectorAll(".btnExcluirProfessor").forEach((btn) => {
+      document.querySelectorAll(".btnSenhaTemporaria").forEach((btn) => {
         btn.addEventListener("click", async () => {
-          await excluirProfessor(btn.dataset.id, btn.dataset.nome);
+          await definirSenhaTemporaria(btn.dataset.id, btn.dataset.nome);
         });
       });
     }
@@ -676,6 +697,56 @@
       setMensagem("Chamada excluída com sucesso.");
       await recarregarTudo();
     }
+
+
+    async function definirSenhaTemporaria(id, nome) {
+      if (id === professorAtual.id) {
+        setMensagem("Você não pode redefinir sua própria senha temporária por esta tela.");
+        return;
+      }
+
+      const senha = prompt(
+        `Defina uma senha temporária para "${nome}".\n\n` +
+        `Essa senha será informada ao professor, e ele será obrigado a trocá-la ao entrar.`
+      );
+
+      if (senha === null) return;
+
+      const senhaLimpa = senha.trim();
+
+      if (!senhaLimpa) {
+        setMensagem("A senha temporária não pode ficar vazia.");
+        return;
+      }
+
+      if (senhaLimpa.length < 6) {
+        setMensagem("A senha temporária deve ter pelo menos 6 caracteres.");
+        return;
+      }
+
+      setMensagem(`Definindo senha temporária para ${nome}...`);
+
+      const { data, error } = await supabase.functions.invoke("resetar-senha-professor", {
+        body: {
+          professor_id: id,
+          nova_senha_temporaria: senhaLimpa
+        }
+      });
+
+      if (error) {
+        console.error("Erro ao chamar a Edge Function:", error);
+        setMensagem("Erro ao definir senha temporária: " + error.message);
+        return;
+      }
+
+      if (!data || data.ok !== true) {
+        setMensagem("Erro ao definir senha temporária: " + (data?.mensagem || "Erro desconhecido."));
+        return;
+      }
+
+      setMensagem(`Senha temporária definida com sucesso para "${nome}".`);
+    }
+
 
     async function recarregarTudo() {
       await carregarPendentes();

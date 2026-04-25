@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>Chamada Escolar - Trocar Senha</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 600px;
+      margin: 40px auto;
+      padding: 20px;
+    }
+
+    .card {
+      border: 1px solid #ccc;
+      border-radius: 10px;
+      padding: 20px;
+      background: #fff;
+    }
+
+    label {
+      display: block;
+      margin-top: 12px;
+      margin-bottom: 6px;
+      font-weight: bold;
+    }
+
+    input, button {
+      width: 100%;
+      padding: 10px;
+      font-size: 15px;
+      box-sizing: border-box;
+    }
+
+    button {
+      margin-top: 16px;
+      cursor: pointer;
+    }
+
+    .mensagem {
+      margin-top: 12px;
+      font-weight: bold;
+    }
+
+    .muted {
+      color: #666;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>Troca obrigatória de senha</h2>
+    <div class="muted">
+      Sua senha foi redefinida pelo administrador e precisa ser trocada antes de continuar.
+    </div>
+
+    <label for="novaSenha">Nova senha</label>
+    <input type="password" id="novaSenha" placeholder="Digite a nova senha" />
+
+    <label for="confirmarSenha">Confirmar nova senha</label>
+    <input type="password" id="confirmarSenha" placeholder="Digite novamente a nova senha" />
+
+    <button id="btnSalvar">Salvar nova senha</button>
+    <div id="msgTela" class="mensagem"></div>
+  </div>
+
+  <script type="module">
+    import { supabase } from "./js/supabase.js";
+
+    const novaSenha = document.getElementById("novaSenha");
+    const confirmarSenha = document.getElementById("confirmarSenha");
+    const btnSalvar = document.getElementById("btnSalvar");
+    const msgTela = document.getElementById("msgTela");
+
+    let usuarioAtual = null;
+    let professorAtual = null;
+
+    function setMensagem(texto) {
+      msgTela.innerText = texto || "";
+    }
+
+    async function carregarSessaoEProfessor() {
+      const { data: sessaoData, error: sessaoError } = await supabase.auth.getSession();
+
+      if (sessaoError) {
+        setMensagem("Erro ao verificar sessão: " + sessaoError.message);
+        return false;
+      }
+
+      const user = sessaoData.session?.user;
+      if (!user) {
+        window.location.href = "index.html";
+        return false;
+      }
+
+      usuarioAtual = user;
+
+      const { data: professor, error: professorError } = await supabase
+        .from("professores")
+        .select("id, nome, exigir_troca_senha")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (professorError || !professor) {
+        setMensagem("Erro ao carregar perfil do professor.");
+        return false;
+      }
+
+      professorAtual = professor;
+
+      // Se não precisa mais trocar, já manda para turmas
+      if (professor.exigir_troca_senha !== true) {
+        window.location.href = "turmas.html";
+        return false;
+      }
+
+      return true;
+    }
+
+    async function salvarNovaSenha() {
+      setMensagem("");
+
+      const senha1 = novaSenha.value.trim();
+      const senha2 = confirmarSenha.value.trim();
+
+      if (!senha1 || !senha2) {
+        setMensagem("Preencha os dois campos.");
+        return;
+      }
+
+      if (senha1.length < 6) {
+        setMensagem("A nova senha deve ter pelo menos 6 caracteres.");
+        return;
+      }
+
+      if (senha1 !== senha2) {
+        setMensagem("As senhas não coincidem.");
+        return;
+      }
+
+      const { error: erroSenha } = await supabase.auth.updateUser({
+        password: senha1
+      });
+
+      if (erroSenha) {
+        setMensagem("Erro ao trocar senha: " + erroSenha.message);
+        return;
+      }
+
+      const { error: erroPerfil } = await supabase
+        .from("professores")
+        .update({
+          exigir_troca_senha: false,
+          ultima_troca_senha_em: new Date().toISOString()
+        })
+        .eq("id", usuarioAtual.id);
+
+      if (erroPerfil) {
+        setMensagem("Senha alterada, mas houve erro ao atualizar o perfil: " + erroPerfil.message);
+        return;
+      }
+
+      setMensagem("Senha alterada com sucesso. Redirecionando...");
+      setTimeout(() => {
+        window.location.href = "turmas.html";
+      }, 1200);
+    }
+
+    btnSalvar.addEventListener("click", async () => {
+      await salvarNovaSenha();
+    });
+
+    carregarSessaoEProfessor();
+  </script>
+</body>
+</html>

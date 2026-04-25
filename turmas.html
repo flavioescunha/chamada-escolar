@@ -177,55 +177,60 @@
     }
 
     async function carregarSessaoEProfessor() {
-      const { data: sessaoData, error: sessaoError } = await supabase.auth.getSession();
+        const { data: sessaoData, error: sessaoError } = await supabase.auth.getSession();
 
-      if (sessaoError) {
-        console.error("Erro ao verificar sessão:", sessaoError);
-        setMensagemTela("Erro ao verificar sessão: " + sessaoError.message);
-        return false;
+        if (sessaoError) {
+          console.error("Erro ao verificar sessão:", sessaoError);
+          setMensagemTela("Erro ao verificar sessão: " + sessaoError.message);
+          return false;
+        }
+
+        const user = sessaoData.session?.user;
+
+        if (!user) {
+          window.location.href = "index.html";
+          return false;
+        }
+
+        usuarioAtual = user;
+
+        const { data: professor, error: professorError } = await supabase
+          .from("professores")
+          .select("id, nome, email, disciplina, is_admin, status, exigir_troca_senha")
+          .eq("id", user.id)
+          .maybeSingle();
+
+        console.log("turmas.html -> user:", user);
+        console.log("turmas.html -> professor:", professor);
+        console.log("turmas.html -> professorError:", professorError);
+
+        if (professorError) {
+          console.error("Erro ao carregar perfil do professor:", professorError);
+          setMensagemTela("Erro ao carregar perfil do professor: " + professorError.message);
+          return false;
+        }
+
+        if (!professor) {
+          setMensagemTela("Perfil de professor não encontrado.");
+          return false;
+        }
+
+        professorAtual = professor;
+
+        if (professor.exigir_troca_senha === true) {
+          window.location.href = "trocar-senha.html";
+          return false;
+        }
+
+        infoProfessor.innerText =
+          `Professor: ${professor.nome} | Disciplina: ${professor.disciplina || ""} | Email: ${professor.email}`;
+
+        if (professor.is_admin === true) {
+          btnAdmin.style.display = "inline-block";
+        }
+
+        return true;
       }
-
-      const user = sessaoData.session?.user;
-
-      if (!user) {
-        window.location.href = "index.html";
-        return false;
-      }
-
-      usuarioAtual = user;
-
-      const { data: professor, error: professorError } = await supabase
-        .from("professores")
-        .select("id, nome, email, disciplina, is_admin, status")
-        .eq("id", user.id)
-        .maybeSingle();
-
-      console.log("turmas.html -> user:", user);
-      console.log("turmas.html -> professor:", professor);
-      console.log("turmas.html -> professorError:", professorError);
-
-      if (professorError) {
-        console.error("Erro ao carregar perfil do professor:", professorError);
-        setMensagemTela("Erro ao carregar perfil do professor: " + professorError.message);
-        return false;
-      }
-
-      if (!professor) {
-        setMensagemTela("Perfil de professor não encontrado.");
-        return false;
-      }
-
-      professorAtual = professor;
-
-      infoProfessor.innerText =
-        `Professor: ${professor.nome} | Disciplina: ${professor.disciplina || ""} | Email: ${professor.email}`;
-
-      if (professor.is_admin === true) {
-        btnAdmin.style.display = "inline-block";
-      }
-
-      return true;
-    }
 
     async function carregarMapaProfessores() {
       const { data, error } = await supabase

@@ -79,7 +79,7 @@
     async function buscarPerfilProfessor(userId) {
       const { data: prof, error: profError } = await supabase
         .from("professores")
-        .select("id, nome, email, status, is_admin")
+        .select("id, nome, email, status, is_admin, exigir_troca_senha")
         .eq("id", userId)
         .maybeSingle();
 
@@ -124,6 +124,11 @@
       if (prof.status === "recusado") {
         msg.innerText = "Seu cadastro não foi aprovado.";
         await supabase.auth.signOut();
+        return;
+      }
+
+      if (prof.exigir_troca_senha === true) {
+        window.location.replace("trocar-senha.html");
         return;
       }
 
@@ -188,6 +193,11 @@
       if (prof.status === "recusado") {
         msg.innerText = "Seu cadastro não foi aprovado.";
         await supabase.auth.signOut();
+        return;
+      }
+
+      if (prof.exigir_troca_senha === true) {
+        window.location.replace("trocar-senha.html");
         return;
       }
 

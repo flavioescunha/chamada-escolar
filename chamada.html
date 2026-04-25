@@ -653,7 +653,7 @@ async function mudarSemana(delta) {
     async function carregarProfessor() {
       const { data, error } = await supabase
         .from("professores")
-        .select("id, nome, email, disciplina")
+        .select("id, nome, email, disciplina, exigir_troca_senha")
         .eq("id", usuarioAtual.id)
         .single();
 
@@ -664,6 +664,12 @@ async function mudarSemana(delta) {
       }
 
       professorAtual = data;
+
+      if (data.exigir_troca_senha === true) {
+        window.location.href = "trocar-senha.html";
+        return false;
+      }
+
       infoProfessor.innerText = `Professor: ${data.nome} | Disciplina: ${data.disciplina || ""} | Email: ${data.email}`;
       return true;
     }
