@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>Chamada Escolar - Turmas</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 900px;
+      margin: 30px auto;
+      padding: 20px;
+    }
+
+    .topo {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .card {
+      border: 1px solid #ccc;
+      border-radius: 10px;
+      padding: 16px;
+      margin-top: 20px;
+      background: #fff;
+    }
+
+    input, select, button {
+      padding: 10px;
+      font-size: 15px;
+      box-sizing: border-box;
+      margin-top: 6px;
+      margin-bottom: 12px;
+    }
+
+    input, select {
+      width: 100%;
+    }
+
+    button {
+      cursor: pointer;
+    }
+
+    
+    .turma-item {
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 12px;
+      margin-top: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      background: #fff;
+      cursor: pointer;
+    }
+
+
+    .mensagem {
+      font-weight: bold;
+      margin-top: 10px;
+    }
+
+    .muted {
+      color: #666;
+      font-size: 14px;
+    }
+
+    .acoes {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .btn-secundario {
+      background: #f2f2f2;
+      border: 1px solid #bbb;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      background: #f3f3f3;
+      border: 1px solid #ccc;
+      margin-top: 6px;
+      margin-right: 6px;
+    }
+
+    .linha-dupla {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    @media (max-width: 700px) {
+      .linha-dupla {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="topo">
+    <div>
+      <h2>Turmas disponíveis</h2>
+      <div id="infoProfessor" class="muted">Carregando professor...</div>
+    </div>
+    <div class="acoes">
+      <button id="btnAdmin" class="btn-secundario" style="display:none;">Administração</button>
+      <button id="btnLogout" class="btn-secundario">Sair</button>
+    </div>
+  </div>
+
+  <div id="msgTela" class="mensagem"></div>
+
+  <!-- LISTA DE TURMAS PRIMEIRO -->
+  <div class="card">
+    <h3>Turmas com chamada hoje</h3>
+    <div id="listaTurmasHoje" class="muted">Carregando...</div>
+  </div>
+
+  <div class="card">
+    <h3>Demais turmas</h3>
+    <div id="listaTurmas">Carregando...</div>
+  </div>
+
+  <!-- CRIAR NOVA TURMA NO FIM -->
+  <div class="card">
+    <h3>Criar nova turma</h3>
+
+    <div class="linha-dupla">
+      <div>
+        <label for="nomeTurma">Nome da turma</label>
+        <input type="text" id="nomeTurma" placeholder="Ex.: 1 EM A">
+      </div>
+
+      <div>
+        <label for="periodoPadrao">Período padrão</label>
+        <select id="periodoPadrao">
+          <option value="Manhã">Manhã</option>
+          <option value="Tarde">Tarde</option>
+          <option value="Noite">Noite</option>
+        </select>
+      </div>
+    </div>
+
+    <button id="btnCriarTurma">Salvar turma</button>
+    <div id="msgCriacao" class="mensagem"></div>
+  </div>
+
+  <script type="module">
+    import { supabase } from "./js/supabase.js";
+
+    const infoProfessor = document.getElementById("infoProfessor");
+    const btnAdmin = document.getElementById("btnAdmin");
+    const btnLogout = document.getElementById("btnLogout");
+    const btnCriarTurma = document.getElementById("btnCriarTurma");
+    const nomeTurma = document.getElementById("nomeTurma");
+    const periodoPadrao = document.getElementById("periodoPadrao");
+    const msgCriacao = document.getElementById("msgCriacao");
+    const msgTela = document.getElementById("msgTela");
+    const listaTurmas = document.getElementById("listaTurmas");
+
+    let usuarioAtual = null;
+    let professorAtual = null;
+    let mapaProfessores = {};
+
+    function setMensagemTela(texto) {
+      msgTela.innerText = texto || "";
+    }
+
+    async function carregarSessaoEProfessor() {
+      const { data: sessaoData, error: sessaoError } = await supabase.auth.getSession();
+
+      if (sessaoError) {
+        console.error("Erro ao verificar sessão:", sessaoError);
+        setMensagemTela("Erro ao verificar sessão: " + sessaoError.message);
+        return false;
+      }
+
+      const user = sessaoData.session?.user;
+
+      if (!user) {
+        window.location.href = "index.html";
+        return false;
+      }
+
+      usuarioAtual = user;
+
+      const { data: professor, error: professorError } = await supabase
+        .from("professores")
+        .select("id, nome, email, disciplina, is_admin, status")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      console.log("turmas.html -> user:", user);
+      console.log("turmas.html -> professor:", professor);
+      console.log("turmas.html -> professorError:", professorError);
+
+      if (professorError) {
+        console.error("Erro ao carregar perfil do professor:", professorError);
+        setMensagemTela("Erro ao carregar perfil do professor: " + professorError.message);
+        return false;
+      }
+
+      if (!professor) {
+        setMensagemTela("Perfil de professor não encontrado.");
+        return false;
+      }
+
+      professorAtual = professor;
+
+      infoProfessor.innerText =
+        `Professor: ${professor.nome} | Disciplina: ${professor.disciplina || ""} | Email: ${professor.email}`;
+
+      if (professor.is_admin === true) {
+        btnAdmin.style.display = "inline-block";
+      }
+
+      return true;
+    }
+
+    async function carregarMapaProfessores() {
+      const { data, error } = await supabase
+        .from("professores")
+        .select("id, nome");
+
+      if (error) {
+        console.error("Erro ao carregar professores:", error);
+        mapaProfessores = {};
+        return;
+      }
+
+      mapaProfessores = {};
+      (data || []).forEach((prof) => {
+        mapaProfessores[prof.id] = prof.nome;
+      });
+    }
+
+    function nomeProfessorPorId(id) {
+      return mapaProfessores[id] || "Professor não identificado";
+    }
+
+    async function carregarTurmas() {
+      const hoje = new Date().toISOString().slice(0, 10);
+
+      const listaHoje = document.getElementById("listaTurmasHoje");
+      listaTurmas.innerHTML = "Carregando...";
+      listaHoje.innerHTML = "Carregando...";
+
+      // 1️⃣ Buscar todas as turmas
+      const { data: turmas, error: erroTurmas } = await supabase
+        .from("turmas")
+        .select("id, nome, periodo_padrao, criado_por")
+        .order("nome", { ascending: true });
+
+      if (erroTurmas) {
+        listaTurmas.innerHTML = "Erro ao carregar turmas.";
+        listaHoje.innerHTML = "";
+        return;
+      }
+
+      // 2️⃣ Buscar chamadas feitas HOJE por ESTE professor
+      const { data: chamadasHoje, error: erroChamadas } = await supabase
+        .from("chamadas")
+        .select("turma_id, aula")
+        .eq("data_chamada", hoje)
+        .eq("criada_por", usuarioAtual.id);
+
+      if (erroChamadas) {
+        console.error(erroChamadas);
+      }
+
+      const mapaChamadasHoje = {};
+      (chamadasHoje || []).forEach(c => {
+        mapaChamadasHoje[c.turma_id] = c.aula;
+      });
+
+      // 3️⃣ Separar turmas
+      const turmasHoje = [];
+      const outrasTurmas = [];
+
+      turmas.forEach(turma => {
+        if (mapaChamadasHoje[turma.id]) {
+          turmasHoje.push({
+            ...turma,
+            aula: mapaChamadasHoje[turma.id]
+          });
+        } else {
+          outrasTurmas.push(turma);
+        }
+      });
+
+      // 4️⃣ Ordenar turmas de hoje por aula
+      turmasHoje.sort((a, b) => a.aula - b.aula);
+
+      // 5️⃣ Render helpers
+      function renderTurma(turma, destino) {
+        const nomeCriador = turma.criado_por
+          ? nomeProfessorPorId(turma.criado_por)
+          : "Não informado";
+
+        const div = document.createElement("div");
+        div.className = "turma-item";
+        div.dataset.id = turma.id;
+
+        div.addEventListener("click", () => {
+          window.location.href = `chamada.html?id=${turma.id}`;
+        });
+
+        div.innerHTML = `
+          <div>
+            <strong>${turma.nome}</strong><br>
+            <span class="muted">Período padrão: ${turma.periodo_padrao || "-"}</span><br>
+            ${turma.aula ? `<span class="badge">Aula ${turma.aula}</span>` : ""}
+            <span class="badge">Criada por: ${nomeCriador}</span>
+          </div>
+          <div class="acoes">
+            <button class="btnAbrir" data-id="${turma.id}">Configurações</button>
+          </div>
+        `;
+
+        div.querySelector(".btnAbrir").addEventListener("click", e => {
+          e.stopPropagation();
+          window.location.href = `turma.html?id=${turma.id}`;
+        });
+
+        destino.appendChild(div);
+      }
+
+      // 6️⃣ Renderizar
+      listaHoje.innerHTML = "";
+      listaTurmas.innerHTML = "";
+
+      if (turmasHoje.length === 0) {
+        listaHoje.innerHTML = `<div class="muted">Nenhuma chamada feita hoje.</div>`;
+      } else {
+        turmasHoje.forEach(t => renderTurma(t, listaHoje));
+      }
+
+      if (outrasTurmas.length === 0) {
+        listaTurmas.innerHTML = `<div class="muted">Nenhuma outra turma.</div>`;
+      } else {
+        outrasTurmas.forEach(t => renderTurma(t, listaTurmas));
+      }
+    }
+    async function criarTurma() {
+      msgCriacao.innerText = "";
+
+      const nome = nomeTurma.value.trim();
+      const periodo = periodoPadrao.value;
+
+      if (!nome) {
+        msgCriacao.innerText = "Digite o nome da turma.";
+        return;
+      }
+
+      const { error } = await supabase
+        .from("turmas")
+        .insert([
+          {
+            nome: nome,
+            periodo_padrao: periodo,
+            criado_por: usuarioAtual.id
+          }
+        ]);
+
+      if (error) {
+        console.error("Erro ao criar turma:", error);
+        msgCriacao.innerText = "Erro ao criar turma: " + error.message;
+        return;
+      }
+
+      msgCriacao.innerText = "Turma criada com sucesso!";
+      nomeTurma.value = "";
+      periodoPadrao.value = "Manhã";
+
+      await carregarMapaProfessores();
+      await carregarTurmas();
+    }
+
+    btnCriarTurma.addEventListener("click", async () => {
+      await criarTurma();
+    });
+
+    btnLogout.addEventListener("click", async () => {
+      const { error } = await supabase.auth.signOut();
+
+      if (error) {
+        console.error("Erro ao sair:", error);
+        alert("Erro ao sair: " + error.message);
+        return;
+      }
+
+      window.location.href = "index.html";
+    });
+
+    btnAdmin.addEventListener("click", () => {
+      window.location.href = "admin.html";
+    });
+
+    async function iniciar() {
+      setMensagemTela("");
+
+      try {
+        const ok = await carregarSessaoEProfessor();
+        if (!ok) return;
+
+        await carregarMapaProfessores();
+        await carregarTurmas();
+      } catch (e) {
+        console.error("Erro geral em turmas.html:", e);
+        setMensagemTela("Erro geral ao carregar a página: " + e.message);
+      }
+    }
+
+    iniciar();
+  </script>
+</body>
+</html>

@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>Chamada Escolar - Login</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 420px;
+      margin: 40px auto;
+      padding: 20px;
+    }
+
+    .card {
+      border: 1px solid #ccc;
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    input, button {
+      width: 100%;
+      padding: 10px;
+      margin-top: 8px;
+      margin-bottom: 16px;
+      font-size: 16px;
+      box-sizing: border-box;
+    }
+
+    button {
+      cursor: pointer;
+    }
+
+    .btn-secundario {
+      background: #f2f2f2;
+      border: 1px solid #bbb;
+    }
+
+    #mensagem {
+      margin-top: 10px;
+      font-weight: bold;
+    }
+
+    .muted {
+      color: #666;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="card">
+    <h2>Login do Professor</h2>
+    <div class="muted">
+      Entre com seu email e senha.
+    </div>
+
+    <label>Email:</label>
+    <input type="email" id="email">
+
+    <label>Senha:</label>
+    <input type="password" id="senha">
+
+    <button id="btnLogin">Entrar</button>
+    <button id="btnCriarConta" class="btn-secundario">Criar conta</button>
+
+    <div id="mensagem"></div>
+  </div>
+
+  <script type="module">
+    import { supabase } from "./js/supabase.js";
+
+    const msg = document.getElementById("mensagem");
+
+    function esperar(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    async function buscarPerfilProfessor(userId) {
+      const { data: prof, error: profError } = await supabase
+        .from("professores")
+        .select("id, nome, email, status, is_admin")
+        .eq("id", userId)
+        .maybeSingle();
+
+      return { prof, profError };
+    }
+
+    async function verificarSessao() {
+      const { data, error } = await supabase.auth.getSession();
+
+      if (error) {
+        msg.innerText = "Erro ao verificar sessão: " + error.message;
+        return;
+      }
+
+      if (!data.session?.user) return;
+
+      // Pequena espera para garantir sessão estável
+      await esperar(300);
+
+      const { prof, profError } = await buscarPerfilProfessor(data.session.user.id);
+
+      console.log("verificarSessao -> user:", data.session.user);
+      console.log("verificarSessao -> prof:", prof);
+      console.log("verificarSessao -> profError:", profError);
+
+      if (profError) {
+        msg.innerText = "Erro ao carregar perfil do professor: " + profError.message;
+        return;
+      }
+
+      if (!prof) {
+        msg.innerText = "Seu usuário existe no login, mas o perfil de professor ainda não foi encontrado.";
+        return;
+      }
+
+      if (prof.status === "pendente") {
+        msg.innerText = "Seu cadastro está pendente de aprovação do administrador.";
+        await supabase.auth.signOut();
+        return;
+      }
+
+      if (prof.status === "recusado") {
+        msg.innerText = "Seu cadastro não foi aprovado.";
+        await supabase.auth.signOut();
+        return;
+      }
+
+      window.location.replace("turmas.html");
+    }
+
+    document.getElementById("btnLogin").addEventListener("click", async () => {
+      const email = document.getElementById("email").value.trim();
+      const senha = document.getElementById("senha").value;
+
+      if (!email || !senha) {
+        msg.innerText = "Preencha email e senha.";
+        return;
+      }
+
+      msg.innerText = "Entrando...";
+
+      const { data: loginData, error } = await supabase.auth.signInWithPassword({
+        email,
+        password: senha
+      });
+
+      if (error) {
+        msg.innerText = "Erro: " + error.message;
+        return;
+      }
+
+      const user = loginData.user;
+
+      if (!user) {
+        msg.innerText = "Login feito, mas não consegui obter o usuário autenticado.";
+        return;
+      }
+
+      // Espera curta para a sessão ficar consistente com as queries RLS
+      await esperar(400);
+
+      const { prof, profError } = await buscarPerfilProfessor(user.id);
+
+      console.log("login -> user:", user);
+      console.log("login -> prof:", prof);
+      console.log("login -> profError:", profError);
+
+      if (profError) {
+        msg.innerText = "Erro ao carregar perfil do professor: " + profError.message;
+        await supabase.auth.signOut();
+        return;
+      }
+
+      if (!prof) {
+        msg.innerText = "Seu login foi encontrado, mas o perfil de professor ainda não foi localizado.";
+        await supabase.auth.signOut();
+        return;
+      }
+
+      if (prof.status === "pendente") {
+        msg.innerText = "Seu cadastro está pendente de aprovação do administrador.";
+        await supabase.auth.signOut();
+        return;
+      }
+
+      if (prof.status === "recusado") {
+        msg.innerText = "Seu cadastro não foi aprovado.";
+        await supabase.auth.signOut();
+        return;
+      }
+
+      window.location.replace("turmas.html");
+    });
+
+    document.getElementById("btnCriarConta").addEventListener("click", () => {
+      window.location.href = "cadastro.html";
+    });
+
+    verificarSessao();
+  </script>
+</body>
+</html>

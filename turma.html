@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>Chamada Escolar - Turma</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 1000px;
+      margin: 30px auto;
+      padding: 20px;
+    }
+
+    .topo {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .card {
+      border: 1px solid #ccc;
+      border-radius: 10px;
+      padding: 16px;
+      margin-top: 20px;
+      background: #fff;
+    }
+
+    input, button {
+      padding: 10px;
+      font-size: 15px;
+      box-sizing: border-box;
+      margin-top: 6px;
+      margin-bottom: 12px;
+      width: 100%;
+    }
+
+    button {
+      cursor: pointer;
+    }
+
+    .linha {
+      display: grid;
+      grid-template-columns: 120px 1fr 160px;
+      gap: 10px;
+    }
+
+    .aluno-item {
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 12px;
+      margin-top: 10px;
+      background: #fff;
+    }
+
+    .muted {
+      color: #666;
+      font-size: 14px;
+    }
+
+    .mensagem {
+      margin-top: 10px;
+      font-weight: bold;
+    }
+
+    .btn-secundario {
+      background: #f2f2f2;
+      border: 1px solid #bbb;
+      width: auto;
+      padding: 10px 16px;
+    }
+
+    @media (max-width: 700px) {
+      .linha {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="topo">
+    <div>
+      <h2>Turma</h2>
+      <div id="infoTurma" class="muted">Carregando turma...</div>
+      <div id="infoProfessor" class="muted">Carregando professor...</div>
+    </div>
+
+    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+      <button id="btnIrChamada" class="btn-secundario">Ir para chamada</button>
+      <button id="btnVoltar" class="btn-secundario">Voltar</button>
+    </div>
+  </div>
+
+  <!-- LISTA DE ALUNOS PRIMEIRO -->
+  <div class="card">
+    <h3>Alunos da turma</h3>
+    <div id="listaAlunos">Carregando...</div>
+  </div>
+
+  <!-- IMPORTAÇÃO NO MEIO -->
+  <div class="card">
+    <h3>Importar alunos da planilha</h3>
+
+    <label for="arquivoPlanilha">Selecione o arquivo .xls ou .xlsx</label>
+    <input type="file" id="arquivoPlanilha" accept=".xls,.xlsx" />
+
+    <button id="btnImportarPlanilha">Importar planilha</button>
+
+    <div class="muted">
+      O sistema tentará localizar automaticamente as colunas Nº, Aluno e RM.
+    </div>
+
+    <div id="msgImportacao" class="mensagem"></div>
+  </div>
+
+  <!-- CADASTRO MANUAL POR ÚLTIMO -->
+  <div class="card">
+    <h3>Cadastrar aluno manualmente</h3>
+
+    <div class="linha">
+      <div>
+        <label for="numeroAluno">Número</label>
+        <input type="number" id="numeroAluno" placeholder="Ex.: 1" />
+      </div>
+
+      <div>
+        <label for="nomeAluno">Nome do aluno</label>
+        <input type="text" id="nomeAluno" placeholder="Ex.: João da Silva" />
+      </div>
+
+      <div>
+        <label for="rmAluno">RM</label>
+        <input type="text" id="rmAluno" placeholder="Ex.: 2549" />
+      </div>
+    </div>
+
+    <button id="btnSalvarAluno">Salvar aluno</button>
+    <div id="msgAluno" class="mensagem"></div>
+  </div>
+
+  <!-- Biblioteca para ler .xls e .xlsx -->
+  <script src="https://cdn/npm/xlsx/dist/xlsx.full.min.js"></script>
+
+  <script type="module">
+    import { supabase } from "./js/supabase.js";
+
+    const infoTurma = document.getElementById("infoTurma");
+    const infoProfessor = document.getElementById("infoProfessor");
+    const btnIrChamada = document.getElementById("btnIrChamada");
+    const btnVoltar = document.getElementById("btnVoltar");
+
+    const btnSalvarAluno = document.getElementById("btnSalvarAluno");
+    const numeroAluno = document.getElementById("numeroAluno");
+    const nomeAluno = document.getElementById("nomeAluno");
+    const rmAluno = document.getElementById("rmAluno");
+    const msgAluno = document.getElementById("msgAluno");
+    const listaAlunos = document.getElementById("listaAlunos");
+
+    const arquivoPlanilha = document.getElementById("arquivoPlanilha");
+    const btnImportarPlanilha = document.getElementById("btnImportarPlanilha");
+    const msgImportacao = document.getElementById("msgImportacao");
+
+    let usuarioAtual = null;
+    let professorAtual = null;
+    let turmaAtual = null;
+
+    function getTurmaIdDaUrl() {
+      const params = new URLSearchParams(window.location.search);
+      return params.get("id");
+    }
+
+    async function carregarSessao() {
+      const { data, error } = await supabase.auth.getSession();
+
+      if (error) {
+        alert("Erro ao verificar sessão: " + error.message);
+        return false;
+      }
+
+      const user = data.session?.user;
+
+      if (!user) {
+        window.location.href = "index.html";
+        return false;
+      }
+
+      usuarioAtual = user;
+      return true;
+    }
+
+    async function carregarProfessor() {
+      const { data, error } = await supabase
+        .from("professores")
+        .select("id, nome, email, disciplina")
+        .eq("id", usuarioAtual.id)
+        .single();
+
+      if (error) {
+        alert("Professor não encontrado.");
+        console.error(error);
+        return false;
+      }
+
+      professorAtual = data;
+      infoProfessor.innerText = `Professor: ${data.nome} | Disciplina: ${data.disciplina || ""}`;
+      return true;
+    }
+
+    async function carregarTurma() {
+      const turmaId = getTurmaIdDaUrl();
+
+      if (!turmaId) {
+        alert("ID da turma não informado.");
+        window.location.href = "turmas.html";
+        return false;
+      }
+
+      const { data, error } = await supabase
+        .from("turmas")
+        .select("id, nome, periodo_padrao, criado_por")
+        .eq("id", turmaId)
+        .single();
+
+      if (error) {
+        alert("Turma não encontrada.");
+        console.error(error);
+        window.location.href = "turmas.html";
+        return false;
+      }
+
+      turmaAtual = data;
+      infoTurma.innerText = `Turma: ${data.nome} | Período padrão: ${data.periodo_padrao || "-"}`;
+      return true;
+    }
+
+    async function carregarAlunos() {
+      listaAlunos.innerHTML = "Carregando alunos...";
+
+      const { data, error } = await supabase
+        .from("alunos")
+        .select("id, numero, nome, rm")
+        .eq("turma_id", turmaAtual.id)
+        .order("numero", { ascending: true });
+
+      if (error) {
+        console.error(error);
+        listaAlunos.innerHTML = `<div class="mensagem">Erro ao carregar alunos: ${error.message}</div>`;
+        return;
+      }
+
+      if (!data || data.length === 0) {
+        listaAlunos.innerHTML = `<div class="muted">Nenhum aluno cadastrado ainda.</div>`;
+        return;
+      }
+
+      listaAlunos.innerHTML = "";
+
+      data.forEach((aluno) => {
+        const div = document.createElement("div");
+        div.className = "aluno-item";
+        div.innerHTML = `
+          <strong>Nº ${aluno.numero} - ${aluno.nome}</strong><br>
+          <span class="muted">RM: ${aluno.rm || "-"}</span>
+        `;
+        listaAlunos.appendChild(div);
+      });
+    }
+
+    async function salvarAluno() {
+      msgAluno.innerText = "";
+
+      const numero = parseInt(numeroAluno.value, 10);
+      const nome = nomeAluno.value.trim();
+      const rm = rmAluno.value.trim();
+
+      if (!numero || !nome) {
+        msgAluno.innerText = "Preencha pelo menos número e nome do aluno.";
+        return;
+      }
+
+      const { error } = await supabase
+        .from("alunos")
+        .insert([
+          {
+            turma_id: turmaAtual.id,
+            numero: numero,
+            nome: nome,
+            rm: rm || null
+          }
+        ]);
+
+      if (error) {
+        console.error(error);
+        msgAluno.innerText = "Erro ao salvar aluno: " + error.message;
+        return;
+      }
+
+      msgAluno.innerText = "Aluno cadastrado com sucesso!";
+      numeroAluno.value = "";
+      nomeAluno.value = "";
+      rmAluno.value = "";
+
+      await carregarAlunos();
+    }
+
+    function normalizarCabecalho(valor) {
+      return String(valor || "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^\w]/g, "")
+        .toLowerCase()
+        .trim();
+    }
+
+    function encontrarIndiceColuna(headers, candidatos) {
+      const normalizados = headers.map(h => normalizarCabecalho(h));
+
+      for (const candidato of candidatos) {
+        const idx = normalizados.indexOf(normalizarCabecalho(candidato));
+        if (idx !== -1) return idx;
+      }
+
+      return -1;
+    }
+
+    function getLinhasPrincipaisDaTabela(table) {
+      const linhas = [];
+
+      for (const filho of Array.from(table.children)) {
+        const tag = filho.tagName?.toUpperCase();
+
+        if (tag === "THEAD" || tag === "TBODY" || tag === "TFOOT") {
+          for (const tr of Array.from(filho.children)) {
+            if (tr.tagName?.toUpperCase() === "TR") {
+              linhas.push(tr);
+            }
+          }
+        } else if (tag === "TR") {
+          linhas.push(filho);
+        }
+      }
+
+      return linhas;
+    }
+
+    function extrairAlunosDeHtmlXls(textoHtml) {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(textoHtml, "text/html");
+
+      const tabela = doc.querySelector("table");
+      if (!tabela) {
+        throw new Error("Não encontrei uma tabela HTML no arquivo .xls.");
+      }
+
+      const linhas = getLinhasPrincipaisDaTabela(tabela);
+      if (!linhas || linhas.length === 0) {
+        throw new Error("A tabela HTML está vazia.");
+      }
+
+      const primeiraLinha = linhas[0];
+      const headers = Array.from(primeiraLinha.children).map(cel =>
+        (cel.textContent || "").replace(/\s+/g, " ").trim()
+      );
+
+      let idxNumero = encontrarIndiceColuna(headers, ["Nº", "N°", "N", "No", "Numero"]);
+      let idxAluno = encontrarIndiceColuna(headers, ["Aluno", "Nome", "Nome do aluno"]);
+      let idxRm = encontrarIndiceColuna(headers, ["RM", "Rm", "Registro"]);
+
+      if (idxNumero === -1 || idxAluno === -1 || idxRm === -1) {
+        throw new Error("Não consegui identificar as colunas Nº, Aluno e RM no HTML.");
+      }
+
+      const mapaAlunos = new Map();
+
+      for (let i = 1; i < linhas.length; i++) {
+        const row = linhas[i];
+        const celulas = Array.from(row.children);
+
+        if (celulas.length < 3) continue;
+
+        const numeroTexto = (celulas[idxNumero]?.textContent || "").replace(/\s+/g, " ").trim();
+        const nomeTexto = (celulas[idxAluno]?.textContent || "").replace(/\s+/g, " ").trim();
+        const rmTexto = (celulas[idxRm]?.textContent || "").replace(/\s+/g, " ").trim();
+
+        const numero = parseInt(String(numeroTexto).replace(/[^\d]/g, ""), 10);
+        const nome = String(nomeTexto || "").trim();
+        const rm = String(rmTexto || "").trim();
+
+        if (!numero || !nome) continue;
+
+        mapaAlunos.set(numero, {
+          numero,
+          nome,
+          rm: rm || null
+        });
+      }
+
+      const alunos = Array.from(mapaAlunos.values()).sort((a, b) => a.numero - b.numero);
+
+      if (alunos.length === 0) {
+        throw new Error("Nenhum aluno válido foi encontrado no HTML do .xls.");
+      }
+
+      return alunos;
+    }
+
+    function textoCelula(ws, r, c) {
+      const endereco = XLSX.utils.encode_cell({ r, c });
+      const celula = ws[endereco];
+
+      if (!celula) return "";
+
+      return String(celula.w ?? celula.v ?? "")
+        .replace(/\s+/g, " ")
+        .trim();
+    }
+
+    function linhaPareceCabecalho(celulasNormalizadas) {
+      const temNumero = celulasNormalizadas.some(v =>
+        ["n", "no", "numero"].includes(v)
+      );
+
+      const temAluno = celulasNormalizadas.some(v =>
+        ["aluno", "nome", "nomedoaluno"].includes(v)
+      );
+
+      const temRm = celulasNormalizadas.some(v =>
+        ["rm", "registro"].includes(v)
+      );
+
+      return temNumero && temAluno && temRm;
+    }
+
+    function extrairAlunosViaSheetJS(workbook) {
+      const nomePrimeiraAba = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[nomePrimeiraAba];
+
+      if (!worksheet || !worksheet["!ref"]) {
+        throw new Error("Não foi possível ler a primeira aba da planilha.");
+      }
+
+      const range = XLSX.utils.decode_range(worksheet["!ref"]);
+
+      let linhaCabecalho = -1;
+      let headers = [];
+
+      for (let r = range.s.r; r <= Math.min(range.e.r, range.s.r + 20); r++) {
+        const linha = [];
+
+        for (let c = range.s.c; c <= range.e.c; c++) {
+          linha.push(textoCelula(worksheet, r, c));
+        }
+
+        const normalizados = linha.map(normalizarCabecalho);
+
+        if (linhaPareceCabecalho(normalizados)) {
+          linhaCabecalho = r;
+          headers = linha;
+          break;
+        }
+      }
+
+      if (linhaCabecalho === -1) {
+        throw new Error("Não encontrei a linha de cabeçalho com Nº, Aluno e RM.");
+      }
+
+      let idxNumero = encontrarIndiceColuna(headers, ["Nº", "N°", "N", "No", "Numero"]);
+      let idxAluno = encontrarIndiceColuna(headers, ["Aluno", "Nome", "Nome do aluno"]);
+      let idxRm = encontrarIndiceColuna(headers, ["RM", "Rm", "Registro"]);
+
+      if (idxNumero === -1 || idxAluno === -1 || idxRm === -1) {
+        throw new Error("Não consegui identificar corretamente as colunas Nº, Aluno e RM.");
+      }
+
+      const mapaAlunos = new Map();
+      let linhasVaziasSeguidas = 0;
+
+      for (let r = linhaCabecalho + 1; r <= range.e.r; r++) {
+        const numeroTexto = textoCelula(worksheet, r, idxNumero);
+        const nomeTexto = textoCelula(worksheet, r, idxAluno);
+        const rmTexto = textoCelula(worksheet, r, idxRm);
+
+        if (!numeroTexto && !nomeTexto && !rmTexto) {
+          linhasVaziasSeguidas++;
+          if (linhasVaziasSeguidas >= 5) break;
+          continue;
+        }
+
+        linhasVaziasSeguidas = 0;
+
+        const numero = parseInt(String(numeroTexto).replace(/[^\d]/g, ""), 10);
+        const nome = String(nomeTexto || "").trim();
+        const rm = String(rmTexto || "").trim();
+
+        if (!numero || !nome) continue;
+
+        mapaAlunos.set(numero, {
+          numero,
+          nome,
+          rm: rm || null
+        });
+      }
+
+      const alunos = Array.from(mapaAlunos.values()).sort((a, b) => a.numero - b.numero);
+
+      if (alunos.length === 0) {
+        throw new Error("Nenhum aluno válido foi encontrado na planilha.");
+      }
+
+      return alunos;
+    }
+
+    async function importarPlanilha() {
+      msgImportacao.innerText = "";
+
+      const arquivo = arquivoPlanilha.files[0];
+
+      if (!arquivo) {
+        msgImportacao.innerText = "Selecione um arquivo .xls ou .xlsx.";
+        return;
+      }
+
+      try {
+        msgImportacao.innerText = "Lendo planilha...";
+
+        let alunosExtraidos = [];
+        const nomeArquivo = (arquivo.name || "").toLowerCase();
+
+        if (nomeArquivo.endsWith(".xls")) {
+          try {
+            const texto = await arquivo.text();
+            alunosExtraidos = extrairAlunosDeHtmlXls(texto);
+            console.log("Importação via HTML .xls:", alunosExtraidos);
+          } catch (erroHtml) {
+            console.warn("Falha na leitura HTML do .xls, tentando via SheetJS...", erroHtml);
+
+            const arrayBuffer = await arquivo.arrayBuffer();
+            const workbook = XLSX.read(arrayBuffer, {
+              type: "array",
+              raw: false,
+              cellText: true,
+              cellDates: true
+            });
+
+            alunosExtraidos = extrairAlunosViaSheetJS(workbook);
+            console.log("Importação via SheetJS:", alunosExtraidos);
+          }
+        } else {
+          const arrayBuffer = await arquivo.arrayBuffer();
+          const workbook = XLSX.read(arrayBuffer, {
+            type: "array",
+            raw: false,
+            cellText: true,
+            cellDates: true
+          });
+
+          alunosExtraidos = extrairAlunosViaSheetJS(workbook);
+          console.log("Importação via SheetJS:", alunosExtraidos);
+        }
+
+        msgImportacao.innerText = `Planilha lida com sucesso. Importando ${alunosExtraidos.length} alunos...`;
+
+        const payload = alunosExtraidos.map((aluno) => ({
+          turma_id: turmaAtual.id,
+          numero: aluno.numero,
+          nome: aluno.nome,
+          rm: aluno.rm
+        }));
+
+        const { error } = await supabase
+          .from("alunos")
+          .upsert(payload, {
+            onConflict: "turma_id,numero"
+          });
+
+        if (error) {
+          console.error("Erro ao importar alunos:", error);
+          msgImportacao.innerText = "Erro ao importar planilha: " + error.message;
+          return;
+        }
+
+        msgImportacao.innerText = `Importação concluída com sucesso! ${payload.length} alunos processados.`;
+        arquivoPlanilha.value = "";
+
+        await carregarAlunos();
+      } catch (e) {
+        console.error("Erro na leitura/importação:", e);
+        msgImportacao.innerText = "Erro ao processar a planilha: " + e.message;
+      }
+    }
+
+    btnSalvarAluno.addEventListener("click", async () => {
+      await salvarAluno();
+    });
+
+    btnImportarPlanilha.addEventListener("click", async () => {
+      await importarPlanilha();
+    });
+
+    btnIrChamada.addEventListener("click", () => {
+      window.location.href = `chamada.html?id=${turmaAtual.id}`;
+    });
+
+    btnVoltar.addEventListener("click", () => {
+      window.location.href = "turmas.html";
+    });
+
+    async function iniciar() {
+      try {
+        const okSessao = await carregarSessao();
+        if (!okSessao) return;
+
+        const okProfessor = await carregarProfessor();
+        if (!okProfessor) return;
+
+        const okTurma = await carregarTurma();
+        if (!okTurma) return;
+
+        await carregarAlunos();
+      } catch (e) {
+        console.error("Erro geral em turma.html:", e);
+        alert("Erro ao carregar a turma: " + e.message);
+      }
+    }
+
+    iniciar();
+  </script>
+</body>
+</html>

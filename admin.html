@@ -1,0 +1,723 @@
+<!DOCTYPE html><!DOCTYPE-BR>
+<head>
+  <meta charset="UTF-8" />
+  <title>Chamada Escolar - Administração</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 1100px;
+      margin: 30px auto;
+      padding: 20px;
+    }
+
+    .topo {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .card {
+      border: 1px solid #ccc;
+      border-radius: 12px;
+      padding: 16px;
+      margin-top: 20px;
+      background: #fff;
+    }
+
+    .item {
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 12px;
+      margin-top: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .muted {
+      color: #666;
+      font-size: 14px;
+    }
+
+    .mensagem {
+      margin-top: 10px;
+      font-weight: bold;
+    }
+
+    .acoes {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      padding: 10px 12px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    .btn-secundario {
+      background: #f2f2f2;
+      border: 1px solid #bbb;
+    }
+
+    .btn-aprovar {
+      background: #e8f6ea;
+      border: 1px solid #98c7a0;
+    }
+
+    .btn-recusar {
+      background: #fdecec;
+      border: 1px solid #e0a0a0;
+    }
+
+    .btn-admin {
+      background: #eef4ff;
+      border: 1px solid #9fb9ef;
+    }
+
+    .btn-excluir {
+      background: #fff2f2;
+      border: 1px solid #e8a3a3;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      border: 1px solid #ccc;
+      background: #f3f3f3;
+      margin-right: 6px;
+      margin-top: 6px;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    .linha-filtro {
+      display: grid;
+      grid-template-columns: 220px auto;
+      gap: 12px;
+      align-items: end;
+      margin-top: 12px;
+    }
+
+    input[type="date"] {
+      padding: 10px;
+      font-size: 14px;
+      box-sizing: border-box;
+    }
+
+    @media (max-width: 850px) {
+      .grid-2 {
+        grid-template-columns: 1fr;
+      }
+
+      .linha-filtro {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="topo">
+    <div>
+      <h2>Administração</h2>
+      <div id="infoAdmin" class="muted">Carregando administrador...</div>
+    </div>
+    <div class="acoes">
+      <button id="btnVoltar" class="btn-secundario">Voltar</button>
+      <button id="btnLogout" class="btn-secundario">Sair</button>
+    </div>
+  </div>
+
+  <div id="msgTela" class="mensagem"></div>
+
+  <div class="grid-2">
+    <div class="card">
+      <h3>Professores pendentes</h3>
+      <div class="muted">Novos professores cadastrados aguardando aprovação.</div>
+      <div id="listaPendentes">Carregando...</div>
+    </div>
+
+    <div class="card">
+      <h3>Professores aprovados</h3>
+      <div class="muted">
+        Administradores podem promover outros professores para admin.
+        Excluir professor remove o perfil em <code>public.professores</code> e bloqueia o uso do sistema.
+      </div>
+      <div id="listaAprovados">Carregando...</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Turmas</h3>
+    <div class="muted">
+      Excluir uma turma remove também os dados relacionados, se o banco estiver com as FKs corretas.
+    </div>
+    <div id="listaTurmas">Carregando...</div>
+  </div>
+
+  <div class="card">
+    <h3>Chamadas</h3>
+    <div class="muted">
+      Apenas as chamadas do dia selecionado são listadas abaixo.
+    </div>
+
+    <div class="linha-filtro">
+      <div>
+        <label for="filtroDataChamadas"><strong>Data das chamadas</strong></label>
+        <input type="date" id="filtroDataChamadas" />
+      </div>
+      <div>
+        <button id="btnCarregarChamadas" class="btn-secundario">
+          Carregar chamadas do dia
+        </button>
+      </div>
+    </div>
+
+    <div id="listaChamadas">Carregando...</div>
+  </div>
+
+  <script type="module">
+    import { supabase } from "./js/supabase.js";
+
+    const infoAdmin = document.getElementById("infoAdmin");
+    const msgTela = document.getElementById("msgTela");
+
+    const btnVoltar = document.getElementById("btnVoltar");
+    const btnLogout = document.getElementById("btnLogout");
+    const btnCarregarChamadas = document.getElementById("btnCarregarChamadas");
+    const filtroDataChamadas = document.getElementById("filtroDataChamadas");
+
+    const listaPendentes = document.getElementById("listaPendentes");
+    const listaAprovados = document.getElementById("listaAprovados");
+    const listaTurmas = document.getElementById("listaTurmas");
+    const listaChamadas = document.getElementById("listaChamadas");
+
+    let usuarioAtual = null;
+    let professorAtual = null;
+    let mapaTurmas = {};
+
+    function setMensagem(texto) {
+      msgTela.innerText = texto || "";
+    }
+
+    function dataHojeISO() {
+      const agora = new Date();
+      const ano = agora.getFullYear();
+      const mes = String(agora.getMonth() + 1).padStart(2, "0");
+      const dia = String(agora.getDate()).padStart(2, "0");
+      return `${ano}-${mes}-${dia}`;
+    }
+
+    async function carregarSessaoEAdmin() {
+      const { data: sessaoData, error: sessaoError } = await supabase.auth.getSession();
+
+      if (sessaoError) {
+        console.error("Erro ao verificar sessão:", sessaoError);
+        setMensagem("Erro ao verificar sessão: " + sessaoError.message);
+        return false;
+      }
+
+      const user = sessaoData.session?.user;
+      if (!user) {
+        window.location.href = "index.html";
+        return false;
+      }
+
+      usuarioAtual = user;
+
+      const { data: prof, error: profError } = await supabase
+        .from("professores")
+        .select("id, nome, email, status, is_admin")
+        .eq("id", usuarioAtual.id)
+        .maybeSingle();
+
+      console.log("admin.html -> user:", user);
+      console.log("admin.html -> prof:", prof);
+      console.log("admin.html -> profError:", profError);
+
+      if (profError) {
+        console.error("Erro ao carregar perfil admin:", profError);
+        setMensagem("Erro ao carregar perfil do administrador: " + profError.message);
+        return false;
+      }
+
+      if (!prof || prof.status !== "aprovado" || prof.is_admin !== true) {
+        alert("Acesso restrito à administração.");
+        window.location.href = "turmas.html";
+        return false;
+      }
+
+      professorAtual = prof;
+      infoAdmin.innerText = `Administrador: ${prof.nome} | ${prof.email}`;
+      return true;
+    }
+
+    async function carregarPendentes() {
+      listaPendentes.innerHTML = "Carregando...";
+
+      const { data, error } = await supabase
+        .from("professores")
+        .select("id, nome, email, disciplina, status, is_admin")
+        .eq("status", "pendente")
+        .order("email", { ascending: true });
+
+      if (error) {
+        console.error("Erro ao carregar pendentes:", error);
+        listaPendentes.innerHTML = `<div class="mensagem">Erro: ${error.message}</div>`;
+        return;
+      }
+
+      if (!data || data.length === 0) {
+        listaPendentes.innerHTML = `<div class="muted">Nenhum professor pendente.</div>`;
+        return;
+      }
+
+      listaPendentes.innerHTML = "";
+
+      data.forEach((prof) => {
+        const div = document.createElement("div");
+        div.className = "item";
+
+        div.innerHTML = `
+          <div>
+            <strong>${prof.nome}</strong><br>
+            <span class="muted">${prof.email}</span><br>
+            <span class="badge">Disciplina: ${prof.disciplina || "-"}</span>
+            <span class="badge">Status: ${prof.status}</span>
+          </div>
+          <div class="acoes">
+            <button class="btn-aprovar" data-id="${prof.id}">Aprovar</button>
+            <button class="btn-recusar" data-id="${prof.id}">Recusar</button>
+            <button class="btn-excluir btnExcluirProfessor" data-id="${prof.id}" data-nome="${prof.nome}">
+              Excluir
+            </button>
+          </div>
+        `;
+
+        listaPendentes.appendChild(div);
+      });
+
+      document.querySelectorAll(".btn-aprovar").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          await aprovarProfessor(btn.dataset.id);
+        });
+      });
+
+      document.querySelectorAll(".btn-recusar").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          await recusarProfessor(btn.dataset.id);
+        });
+      });
+
+      document.querySelectorAll(".btnExcluirProfessor").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          await excluirProfessor(btn.dataset.id, btn.dataset.nome);
+        });
+      });
+    }
+
+    async function carregarAprovados() {
+      listaAprovados.innerHTML = "Carregando...";
+
+      const { data, error } = await supabase
+        .from("professores")
+        .select("id, nome, email, disciplina, status, is_admin")
+        .eq("status", "aprovado")
+        .order("nome", { ascending: true });
+
+      if (error) {
+        console.error("Erro ao carregar aprovados:", error);
+        listaAprovados.innerHTML = `<div class="mensagem">Erro: ${error.message}</div>`;
+        return;
+      }
+
+      if (!data || data.length === 0) {
+        listaAprovados.innerHTML = `<div class="muted">Nenhum professor aprovado.</div>`;
+        return;
+      }
+
+      listaAprovados.innerHTML = "";
+
+      data.forEach((prof) => {
+        const souEu = prof.id === professorAtual.id;
+
+        const div = document.createElement("div");
+        div.className = "item";
+
+        div.innerHTML = `
+          <div>
+            <strong>${prof.nome}</strong><br>
+            <span class="muted">${prof.email}</span><br>
+            <span class="badge">Disciplina: ${prof.disciplina || "-"}</span>
+            <span class="badge">Admin: ${prof.is_admin ? "Sim" : "Não"}</span>
+          </div>
+          <div class="acoes">
+            ${
+              prof.is_admin
+                ? `<button class="btn-admin" data-id="${prof.id}" data-acao="remover" ${souEu ? "disabled" : ""}>Remover Admin</button>`
+                : `<button class="btn-admin" data-id="${prof.id}" data-acao="promover">Tornar Admin</button>`
+            }
+            <button class="btn-excluir btnExcluirProfessor" data-id="${prof.id}" data-nome="${prof.nome}" ${souEu ? "disabled" : ""}>
+              Excluir
+            </button>
+          </div>
+        `;
+
+        listaAprovados.appendChild(div);
+      });
+
+      document.querySelectorAll(".btn-admin").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          const id = btn.dataset.id;
+          const acao = btn.dataset.acao;
+
+          if (acao === "promover") {
+            await promoverAdmin(id);
+          } else {
+            await removerAdmin(id);
+          }
+        });
+      });
+
+      document.querySelectorAll(".btnExcluirProfessor").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          await excluirProfessor(btn.dataset.id, btn.dataset.nome);
+        });
+      });
+    }
+
+    async function carregarTurmas() {
+      listaTurmas.innerHTML = "Carregando...";
+
+      const { data, error } = await supabase
+        .from("turmas")
+        .select("id, nome, periodo_padrao, criado_por")
+        .order("nome", { ascending: true });
+
+      if (error) {
+        console.error("Erro ao carregar turmas:", error);
+        listaTurmas.innerHTML = `<div class="mensagem">Erro: ${error.message}</div>`;
+        return;
+      }
+
+      if (!data || data.length === 0) {
+        listaTurmas.innerHTML = `<div class="muted">Nenhuma turma cadastrada.</div>`;
+        return;
+      }
+
+      listaTurmas.innerHTML = "";
+      mapaTurmas = {};
+
+      data.forEach((turma) => {
+        mapaTurmas[turma.id] = turma.nome;
+
+        const div = document.createElement("div");
+        div.className = "item";
+
+        div.innerHTML = `
+          <div>
+            <strong>${turma.nome}</strong><br>
+            <span class="muted">Período padrão: ${turma.periodo_padrao || "-"}</span>
+          </div>
+          <div class="acoes">
+            <button class="btn-excluir btnExcluirTurma" data-id="${turma.id}" data-nome="${turma.nome}">
+              Excluir turma
+            </button>
+          </div>
+        `;
+
+        listaTurmas.appendChild(div);
+      });
+
+      document.querySelectorAll(".btnExcluirTurma").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          await excluirTurma(btn.dataset.id, btn.dataset.nome);
+        });
+      });
+    }
+
+    async function carregarChamadas() {
+      listaChamadas.innerHTML = "Carregando...";
+
+      const dataSelecionada = filtroDataChamadas.value;
+
+      if (!dataSelecionada) {
+        listaChamadas.innerHTML = `<div class="muted">Selecione uma data.</div>`;
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("chamadas")
+        .select("id, turma_id, data_chamada, periodo, aula")
+        .eq("data_chamada", dataSelecionada)
+        .order("aula", { ascending: true });
+
+      if (error) {
+        console.error("Erro ao carregar chamadas:", error);
+        listaChamadas.innerHTML = `<div class="mensagem">Erro: ${error.message}</div>`;
+        return;
+      }
+
+      if (!data || data.length === 0) {
+        listaChamadas.innerHTML = `<div class="muted">Nenhuma chamada encontrada para ${dataSelecionada}.</div>`;
+        return;
+      }
+
+      listaChamadas.innerHTML = "";
+
+      data.forEach((chamada) => {
+        const nomeTurma = mapaTurmas[chamada.turma_id] || "Turma não identificada";
+
+        const div = document.createElement("div");
+        div.className = "item";
+
+        div.innerHTML = `
+          <div>
+            <strong>${nomeTurma}</strong><br>
+            <span class="muted">
+              Data: ${chamada.data_chamada} | Período: ${chamada.periodo} | Aula: ${chamada.aula}
+            </span>
+          </div>
+          <div class="acoes">
+            <button
+              class="btn-excluir btnExcluirChamada"
+              data-id="${chamada.id}"
+              data-descricao="${nomeTurma} - ${chamada.data_chamada} - ${chamada.periodo} - Aula ${chamada.aula}">
+              Excluir chamada
+            </button>
+          </div>
+        `;
+
+        listaChamadas.appendChild(div);
+      });
+
+      document.querySelectorAll(".btnExcluirChamada").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          await excluirChamada(btn.dataset.id, btn.dataset.descricao);
+        });
+      });
+    }
+
+    async function aprovarProfessor(id) {
+      setMensagem("Aprovando professor...");
+
+      const { error } = await supabase
+        .from("professores")
+        .update({
+          status: "aprovado",
+          aprovado_por: professorAtual.id,
+          aprovado_em: new Date().toISOString()
+        })
+        .eq("id", id);
+
+      if (error) {
+        console.error("Erro ao aprovar professor:", error);
+        setMensagem("Erro ao aprovar professor: " + error.message);
+        return;
+      }
+
+      setMensagem("Professor aprovado com sucesso.");
+      await recarregarTudo();
+    }
+
+    async function recusarProfessor(id) {
+      const confirmar = confirm("Tem certeza que deseja recusar este professor?");
+      if (!confirmar) return;
+
+      setMensagem("Recusando professor...");
+
+      const { error } = await supabase
+        .from("professores")
+        .update({
+          status: "recusado",
+          aprovado_por: professorAtual.id,
+          aprovado_em: new Date().toISOString()
+        })
+        .eq("id", id);
+
+      if (error) {
+        console.error("Erro ao recusar professor:", error);
+        setMensagem("Erro ao recusar professor: " + error.message);
+        return;
+      }
+
+      setMensagem("Professor recusado.");
+      await recarregarTudo();
+    }
+
+    async function promoverAdmin(id) {
+      setMensagem("Promovendo administrador...");
+
+      const { error } = await supabase
+        .from("professores")
+        .update({
+          is_admin: true
+        })
+        .eq("id", id);
+
+      if (error) {
+        console.error("Erro ao promover admin:", error);
+        setMensagem("Erro ao promover administrador: " + error.message);
+        return;
+      }
+
+      setMensagem("Professor promovido a administrador.");
+      await recarregarTudo();
+    }
+
+    async function removerAdmin(id) {
+      if (id === professorAtual.id) {
+        setMensagem("Você não pode remover seu próprio status de administrador nesta tela.");
+        return;
+      }
+
+      const confirmar = confirm("Tem certeza que deseja remover o status de administrador deste professor?");
+      if (!confirmar) return;
+
+      setMensagem("Removendo administrador...");
+
+      const { error } = await supabase
+        .from("professores")
+        .update({
+          is_admin: false
+        })
+        .eq("id", id);
+
+      if (error) {
+        console.error("Erro ao remover admin:", error);
+        setMensagem("Erro ao remover administrador: " + error.message);
+        return;
+      }
+
+      setMensagem("Status de administrador removido.");
+      await recarregarTudo();
+    }
+
+    async function excluirProfessor(id, nome) {
+      if (id === professorAtual.id) {
+        setMensagem("Você não pode excluir seu próprio perfil nesta tela.");
+        return;
+      }
+
+      const confirmar = confirm(
+        `Tem certeza que deseja excluir o professor "${nome}"?\n\n` +
+        `Isso removerá o perfil em public.professores e bloqueará o uso do sistema.`
+      );
+      if (!confirmar) return;
+
+      setMensagem("Excluindo professor...");
+
+      const { error } = await supabase
+        .from("professores")
+        .delete()
+        .eq("id", id);
+
+      if (error) {
+        console.error("Erro ao excluir professor:", error);
+        setMensagem("Erro ao excluir professor: " + error.message);
+        return;
+      }
+
+      setMensagem(`Professor "${nome}" excluído do sistema.`);
+      await recarregarTudo();
+    }
+
+    async function excluirTurma(id, nome) {
+      const confirmar = confirm(`Tem certeza que deseja excluir a turma "${nome}"?`);
+      if (!confirmar) return;
+
+      setMensagem("Excluindo turma...");
+
+      const { error } = await supabase
+        .from("turmas")
+        .delete()
+        .eq("id", id);
+
+      if (error) {
+        console.error("Erro ao excluir turma:", error);
+        setMensagem("Erro ao excluir turma: " + error.message);
+        return;
+      }
+
+      setMensagem(`Turma "${nome}" excluída com sucesso.`);
+      await recarregarTudo();
+    }
+
+    async function excluirChamada(id, descricao) {
+      const confirmar = confirm(`Tem certeza que deseja excluir a chamada:\n\n${descricao}?`);
+      if (!confirmar) return;
+
+      setMensagem("Excluindo chamada...");
+
+      const { error } = await supabase
+        .from("chamadas")
+        .delete()
+        .eq("id", id);
+
+      if (error) {
+        console.error("Erro ao excluir chamada:", error);
+        setMensagem("Erro ao excluir chamada: " + error.message);
+        return;
+      }
+
+      setMensagem("Chamada excluída com sucesso.");
+      await recarregarTudo();
+    }
+
+    async function recarregarTudo() {
+      await carregarPendentes();
+      await carregarAprovados();
+      await carregarTurmas();
+      await carregarChamadas();
+    }
+
+    btnVoltar.addEventListener("click", () => {
+      window.location.href = "turmas.html";
+    });
+
+    btnLogout.addEventListener("click", async () => {
+      const { error } = await supabase.auth.signOut();
+
+      if (error) {
+        alert("Erro ao sair: " + error.message);
+        return;
+      }
+
+      window.location.href = "index.html";
+    });
+
+    btnCarregarChamadas.addEventListener("click", async () => {
+      await carregarChamadas();
+    });
+
+    filtroDataChamadas.addEventListener("change", async () => {
+      await carregarChamadas();
+    });
+
+    async function iniciar() {
+      filtroDataChamadas.value = dataHojeISO();
+
+      const ok = await carregarSessaoEAdmin();
+      if (!ok) return;
+
+      await recarregarTudo();
+    }
+
+    iniciar();
+  </script>
+
+</body>
+</html>

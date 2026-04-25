@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>Chamada Escolar - Criar conta</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 480px;
+      margin: 40px auto;
+      padding: 20px;
+    }
+
+    .card {
+      border: 1px solid #ccc;
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    h2 {
+      margin-top: 0;
+    }
+
+    label {
+      display: block;
+      margin-top: 10px;
+      margin-bottom: 6px;
+      font-weight: bold;
+    }
+
+    input, button {
+      width: 100%;
+      padding: 10px;
+      font-size: 16px;
+      box-sizing: border-box;
+      margin-bottom: 12px;
+    }
+
+    button {
+      cursor: pointer;
+    }
+
+    .btn-secundario {
+      background: #f2f2f2;
+      border: 1px solid #bbb;
+    }
+
+    .mensagem {
+      margin-top: 10px;
+      font-weight: bold;
+    }
+
+    .muted {
+      color: #666;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="card">
+    <h2>Criar conta de professor</h2>
+    <div class="muted">
+      Preencha os dados abaixo para criar seu acesso.
+    </div>
+
+    <label for="nome">Nome completo</label>
+    <input type="text" id="nome" placeholder="Ex.: Pedro Álvares Cabral" />
+
+    <label for="disciplina">Disciplina</label>
+    <input type="text" id="disciplina" placeholder="Ex.: Geografia" />
+
+    <label for="email">Email</label>
+    <input type="email" id="email" placeholder="Ex.: cabral@descobre.com" />
+
+    <label for="senha">Senha</label>
+    <input type="password" id="senha" placeholder="Digite uma senha" />
+
+    <label for="confirmarSenha">Confirmar senha</label>
+    <input type="password" id="confirmarSenha" placeholder="Repita a senha" />
+
+    <button id="btnCriarConta">Criar conta</button>
+    <button id="btnVoltar" class="btn-secundario">Voltar para login</button>
+
+    <div id="mensagem" class="mensagem"></div>
+  </div>
+
+  <script type="module">
+    import { supabase } from "./js/supabase.js";
+
+    const nomeInput = document.getElementById("nome");
+    const disciplinaInput = document.getElementById("disciplina");
+    const emailInput = document.getElementById("email");
+    const senhaInput = document.getElementById("senha");
+    const confirmarSenhaInput = document.getElementById("confirmarSenha");
+
+    const btnCriarConta = document.getElementById("btnCriarConta");
+    const btnVoltar = document.getElementById("btnVoltar");
+    const mensagem = document.getElementById("mensagem");
+
+    function setMensagem(texto) {
+      mensagem.innerText = texto;
+    }
+
+    async function criarConta() {
+      setMensagem("");
+
+      const nome = nomeInput.value.trim();
+      const disciplina = disciplinaInput.value.trim();
+      const email = emailInput.value.trim();
+      const senha = senhaInput.value;
+      const confirmarSenha = confirmarSenhaInput.value;
+
+      if (!nome || !disciplina || !email || !senha || !confirmarSenha) {
+        setMensagem("Preencha todos os campos.");
+        return;
+      }
+
+      if (senha !== confirmarSenha) {
+        setMensagem("A senha e a confirmação não coincidem.");
+        return;
+      }
+
+      if (senha.length < 6) {
+        setMensagem("A senha deve ter pelo menos 6 caracteres.");
+        return;
+      }
+
+      setMensagem("Criando conta...");
+
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password: senha,
+        options: {
+          data: {
+            nome,
+            disciplina
+          }
+        }
+      });
+
+      if (error) {
+        console.error("Erro no signUp:", error);
+
+        if ((error.message || "").toLowerCase().includes("email rate limit exceeded")) {
+          setMensagem(
+            "Limite temporário de emails do Supabase atingido. " +
+            "Para continuar testando agora, crie o professor manualmente em Authentication > Users. " +
+            "Depois o trigger criará automaticamente o perfil na tabela professores."
+          );
+          return;
+        }
+
+        setMensagem("Erro ao criar conta: " + error.message);
+        return;
+      }
+
+      setMensagem(
+        "Conta criada com sucesso no Auth. " +
+        "Se o projeto não exigir confirmação de email, já será possível fazer login."
+      );
+
+      setTimeout(() => {
+        window.location.href = "index.html?cadastro=ok";
+      }, 1500);
+    }
+
+    btnCriarConta.addEventListener("click", async () => {
+      await criarConta();
+    });
+
+    btnVoltar.addEventListener("click", () => {
+      window.location.href = "index.html";
+    });
+  </script>
+</body>
+</html>
