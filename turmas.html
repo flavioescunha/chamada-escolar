@@ -351,14 +351,26 @@
         outrasTurmas.forEach(t => renderTurma(t, listaTurmas));
       }
     }
+
+    function nomeTurmaValido(nome) {
+      return /^\d{1,2} [A-Z]{2} [A-Z]$/.test(nome);
+    }
+
     async function criarTurma() {
       msgCriacao.innerText = "";
 
-      const nome = nomeTurma.value.trim();
+      const nome = nomeTurma.value.trim().toUpperCase();
       const periodo = periodoPadrao.value;
+
+      nomeTurma.value = nome;
 
       if (!nome) {
         msgCriacao.innerText = "Digite o nome da turma.";
+        return;
+      }
+
+      if (!nomeTurmaValido(nome)) {
+        msgCriacao.innerText = "Nome inválido. Use o formato: 1 EM A ou 6 EF B.";
         return;
       }
 
