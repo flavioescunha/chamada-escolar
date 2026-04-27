@@ -66,6 +66,13 @@
       border: 1px solid #bbb;
     }
 
+    
+    .btn-liberar {
+      background: #fff4e5;
+      border: 1px solid #d9b26f;
+    }
+
+
     .btn-aprovar {
       background: #e8f6ea;
       border: 1px solid #98c7a0;
@@ -174,6 +181,15 @@
   </div>
 
   <div class="card">
+    <h3>Slots vinculados</h3>
+    <div class="muted">
+      Aqui o administrador pode liberar um slot semanal que foi vinculado por engano.
+    </div>
+    <div id="listaSlots">Carregando...</div>
+  </div>
+
+
+  <div class="card">
     <h3>Chamadas</h3>
     <div class="muted">
       Apenas as chamadas do dia selecionado são listadas abaixo.
@@ -210,6 +226,8 @@
     const listaTurmas = document.getElementById("listaTurmas");
     const listaChamadas = document.getElementById("listaChamadas");
 
+    const listaSlots = document.getElementById("listaSlots");
+
     let usuarioAtual = null;
     let professorAtual = null;
     let mapaTurmas = {};
@@ -224,6 +242,19 @@
       const mes = String(agora.getMonth() + 1).padStart(2, "0");
       const dia = String(agora.getDate()).padStart(2, "0");
       return `${ano}-${mes}-${dia}`;
+    }
+
+    function nomeDiaSemana(numero) {
+      const nomes = [
+        "Domingo",
+        "Segunda-feira",
+        "Terça-feira",
+        "Quarta-feira",
+        "Quinta-feira",
+        "Sexta-feira",
+        "Sábado"
+      ];
+      return nomes[numero] ?? "Dia desconhecido";
     }
 
     async function carregarSessaoEAdmin() {
@@ -418,6 +449,12 @@
           await definirSenhaTemporaria(btn.dataset.id, btn.dataset.nome);
         });
       });
+
+      document.querySelectorAll(".btnExcluirProfessor").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          await excluirProfessor(btn.dataset.id, btn.dataset.nome);
+        });
+      });
     }
 
     async function carregarTurmas() {
@@ -466,6 +503,76 @@
       document.querySelectorAll(".btnExcluirTurma").forEach((btn) => {
         btn.addEventListener("click", async () => {
           await excluirTurma(btn.dataset.id, btn.dataset.nome);
+        });
+      });
+    }
+
+    async function carregarSlots() {
+      listaSlots.innerHTML = "Carregando...";
+
+      const { data, error } = await supabase
+        .from("propriedade_horario")
+        .select("turma_id, dia_semana, periodo, aula, professor_id, professor_nome, atualizado_em")
+        .order("turma_id", { ascending: true })
+        .order("dia_semana", { ascending: true })
+        .order("periodo", { ascending: true })
+        .order("aula", { ascending: true });
+
+      if (error) {
+        console.error("Erro ao carregar slots:", error);
+        listaSlots.innerHTML = `<div class="mensagem">Erro: ${error.message}</div>`;
+        return;
+      }
+
+      if (!data || data.length === 0) {
+        listaSlots.innerHTML = `<div class="muted">Nenhum slot vinculado.</div>`;
+        return;
+      }
+
+      listaSlots.innerHTML = "";
+
+      data.forEach((slot) => {
+        const nomeTurma = mapaTurmas[slot.turma_id] || "Turma não identificada";
+
+        const div = document.createElement("div");
+        div.className = "item";
+
+        div.innerHTML = `
+          <div>
+            <strong>${nomeTurma}</strong><br>
+            <span class="muted">
+              ${nomeDiaSemana(slot.dia_semana)} | ${slot.periodo} | Aula ${slot.aula}
+            </span><br>
+            <span class="badge">Professor: ${slot.professor_nome || "Não informado"}</span>
+          </div>
+          <div class="acoes">
+            <button
+              class="btn-liberar btnLiberarSlot"
+              data-turma-id="${slot.turma_id}"
+              data-dia-semana="${slot.dia_semana}"
+              data-periodo="${slot.periodo}"
+              data-aula="${slot.aula}"
+              data-professor="${slot.professor_nome || ""}"
+              data-turma="${nomeTurma}"
+            >
+              Liberar slot
+            </button>
+          </div>
+        `;
+
+        listaSlots.appendChild(div);
+      });
+
+      document.querySelectorAll(".btnLiberarSlot").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          await liberarSlot(
+            btn.dataset.turmaId,
+            btn.dataset.diaSemana,
+            btn.dataset.periodo,
+            btn.dataset.aula,
+            btn.dataset.turma,
+            btn.dataset.professor
+          );
         });
       });
     }
@@ -747,11 +854,44 @@
       setMensagem(`Senha temporária definida com sucesso para "${nome}".`);
     }
 
+    async function liberarSlot(turmaId, diaSemana, periodo, aula, nomeTurma, nomeProfessor) {
+      const confirmar = confirm(
+        `Tem certeza que deseja liberar este slot?\n\n` +
+        `Turma: ${nomeTurma}\n` +
+        `Dia: ${nomeDiaSemana(Number(diaSemana))}\n` +
+        `Período: ${periodo}\n` +
+        `Aula: ${aula}\n` +
+        `Professor atual: ${nomeProfessor || "Não informado"}`
+      );
+
+      if (!confirmar) return;
+
+      setMensagem("Liberando slot...");
+
+      const { error } = await supabase
+        .from("propriedade_horario")
+        .delete()
+        .eq("turma_id", turmaId)
+        .eq("dia_semana", Number(diaSemana))
+        .eq("periodo", periodo)
+        .eq("aula", Number(aula));
+
+      if (error) {
+        console.error("Erro ao liberar slot:", error);
+        setMensagem("Erro ao liberar slot: " + error.message);
+        return;
+      }
+
+      setMensagem("Slot liberado com sucesso.");
+      await recarregarTudo();
+    }
+
 
     async function recarregarTudo() {
       await carregarPendentes();
       await carregarAprovados();
       await carregarTurmas();
+      await carregarSlots();
       await carregarChamadas();
     }
 

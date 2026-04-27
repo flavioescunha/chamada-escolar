@@ -874,6 +874,20 @@ async function mudarSemana(delta) {
       }
 
       const chave = getChaveHorarioAtual();
+      const diaNome = getNomeDiaSemana(chave.dia_semana);
+
+      const confirmar = confirm(
+        `Este slot semanal ainda está livre.\n\n` +
+        `Turma: ${turmaAtual.nome}\n` +
+        `Dia: ${diaNome}\n` +
+        `Período: ${chave.periodo}\n` +
+        `Aula: ${chave.aula}\n\n` +
+        `Você confirma que esta aula é realmente sua e deseja vinculá-la ao seu nome?`
+      );
+
+      if (!confirmar) {
+        throw new Error("Operação cancelada. O slot não foi vinculado.");
+      }
 
       const payload = {
         turma_id: chave.turma_id,
@@ -1216,7 +1230,12 @@ async function mudarSemana(delta) {
             delete ultimaAlteracaoMap[alunoId];
           }
 
-          msgTela.innerText = "Erro ao salvar alteração: " + erro.message;
+          if (erro.message === "Operação cancelada. O slot não foi vinculado.") {
+            msgTela.innerText = erro.message;
+          } else {
+            msgTela.innerText = "Erro ao salvar alteração: " + erro.message;
+          }
+
         } finally {
           salvandoMap[alunoId] = false;
           await carregarPermissaoHorario();
