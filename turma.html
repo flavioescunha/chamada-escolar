@@ -148,7 +148,8 @@
   </div>
 
   <!-- Biblioteca para ler .xls e .xlsx -->
-  <script src="https://cdn/npm/xlsx/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+
 
   <script type="module">
     import { supabase } from "./js/supabase.js";
@@ -401,7 +402,7 @@
       let idxNumero = encontrarIndiceColuna(headers, ["Nº", "N°", "N", "No", "Numero"]);
       let idxAluno = encontrarIndiceColuna(headers, ["Aluno", "Nome", "Nome do aluno"]);
       let idxRm = encontrarIndiceColuna(headers, ["RM", "Rm", "Registro"]);
-      let idxLancamento = encontrarIndiceColuna(headers, ["Lançamento", "Lancamento"]);
+      let idxLancamento = encontrarIndiceColuna(headers, ["Lançamento", "Lancamento", "Lansamento"]);
 
       if (idxNumero === -1 || idxAluno === -1 || idxRm === -1) {
         throw new Error("Não consegui identificar as colunas Nº, Aluno e RM no HTML.");
@@ -511,7 +512,7 @@
       let idxNumero = encontrarIndiceColuna(headers, ["Nº", "N°", "N", "No", "Numero"]);
       let idxAluno = encontrarIndiceColuna(headers, ["Aluno", "Nome", "Nome do aluno"]);
       let idxRm = encontrarIndiceColuna(headers, ["RM", "Rm", "Registro"]);
-      let idxLancamento = encontrarIndiceColuna(headers, ["Lançamento", "Lancamento"]);
+      let idxLancamento = encontrarIndiceColuna(headers, ["Lançamento", "Lancamento", "Lansamento"]);
 
       if (idxNumero === -1 || idxAluno === -1 || idxRm === -1) {
         throw new Error("Não consegui identificar corretamente as colunas Nº, Aluno e RM.");
