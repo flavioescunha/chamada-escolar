@@ -1,0 +1,2 @@
+[functions.exportar-faltas]
+verify_jwt = false

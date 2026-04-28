@@ -360,6 +360,27 @@
       return -1;
     }
 
+    function encontrarIndiceLancamento(headers) {
+      const normalizados = headers.map(h => normalizarCabecalho(h));
+
+      // Tentativas diretas
+      let idx = normalizados.indexOf("lancamento");
+      if (idx !== -1) return idx;
+
+      idx = normalizados.indexOf("lansamento");
+      if (idx !== -1) return idx;
+
+      // Tentativa aproximada: qualquer cabeçalho que comece com "lan" e contenha "amento"
+      idx = normalizados.findIndex(h => h.startsWith("lan") && h.includes("amento"));
+      if (idx !== -1) return idx;
+
+      // Fallback seguro para este modelo de planilha:
+      // Nº | Aluno | RM | Lançamento | Justificativa
+      if (headers.length >= 4) return 3;
+
+      return -1;
+    }
+    
     function getLinhasPrincipaisDaTabela(table) {
       const linhas = [];
 
@@ -402,7 +423,11 @@
       let idxNumero = encontrarIndiceColuna(headers, ["Nº", "N°", "N", "No", "Numero"]);
       let idxAluno = encontrarIndiceColuna(headers, ["Aluno", "Nome", "Nome do aluno"]);
       let idxRm = encontrarIndiceColuna(headers, ["RM", "Rm", "Registro"]);
-      let idxLancamento = encontrarIndiceColuna(headers, ["Lançamento", "Lancamento", "Lansamento"]);
+      let idxLancamento = encontrarIndiceLancamento(headers);
+
+      console.log("Headers HTML:", headers);
+      console.log("Headers HTML normalizados:", headers.map(normalizarCabecalho));
+      console.log("idxLancamento HTML:", idxLancamento);
 
       if (idxNumero === -1 || idxAluno === -1 || idxRm === -1) {
         throw new Error("Não consegui identificar as colunas Nº, Aluno e RM no HTML.");
@@ -512,7 +537,7 @@
       let idxNumero = encontrarIndiceColuna(headers, ["Nº", "N°", "N", "No", "Numero"]);
       let idxAluno = encontrarIndiceColuna(headers, ["Aluno", "Nome", "Nome do aluno"]);
       let idxRm = encontrarIndiceColuna(headers, ["RM", "Rm", "Registro"]);
-      let idxLancamento = encontrarIndiceColuna(headers, ["Lançamento", "Lancamento", "Lansamento"]);
+      let idxLancamento = encontrarIndiceLancamento(headers);
 
       if (idxNumero === -1 || idxAluno === -1 || idxRm === -1) {
         throw new Error("Não consegui identificar corretamente as colunas Nº, Aluno e RM.");
