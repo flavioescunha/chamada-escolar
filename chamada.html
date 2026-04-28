@@ -175,6 +175,13 @@
       cursor: pointer;
     }
 
+    .aluno-card.transferido {
+        background: #eeeeee;
+        border-color: #c8c8c8;
+        color: #777;
+        cursor: not-allowed;
+      }
+
     .aluno-card.bloqueado {
       cursor: not-allowed;
       opacity: 0.85;
@@ -709,7 +716,7 @@ async function mudarSemana(delta) {
     async function carregarAlunosDaTurma() {
       const { data, error } = await supabase
         .from("alunos")
-        .select("id, numero, nome, rm")
+        .select("id, numero, nome, rm, transferido")
         .eq("turma_id", turmaAtual.id)
         .order("numero", { ascending: true });
 
@@ -1045,10 +1052,12 @@ async function mudarSemana(delta) {
 
 
     function atualizarResumo() {
-      const total = alunosDaTurma.length;
+      const alunosAtivos = alunosDaTurma.filter((aluno) => aluno.transferido !== true);
+      const total = alunosAtivos.length;
+
       let faltas = 0;
 
-      alunosDaTurma.forEach((aluno) => {
+      alunosAtivos.forEach((aluno) => {
         const status = presencasMap[aluno.id] || "C";
         if (status === "F") faltas++;
       });
@@ -1059,8 +1068,7 @@ async function mudarSemana(delta) {
       resumoPresentes.innerText = presentes;
       resumoFaltas.innerText = faltas;
     }
-
-    function renderizarAlunos() {
+        function renderizarAlunos() {
       if (!alunosDaTurma || alunosDaTurma.length === 0) {
         listaAlunos.innerHTML = `<div class="sem-alunos">Nenhum aluno cadastrado nesta turma.</div>`;
         return;
@@ -1072,9 +1080,10 @@ async function mudarSemana(delta) {
         const status = presencasMap[aluno.id] || "C";
         const ultima = ultimaAlteracaoMap[aluno.id];
         const salvando = salvandoMap[aluno.id] === true;
+        const transferido = aluno.transferido === true;
 
         const div = document.createElement("div");
-        div.className = `aluno-card ${status === "F" ? "falta" : "presente"} ${!podeEditar ? "bloqueado" : ""} ${salvando ? "salvando" : ""}`;
+        div.className = `aluno-card ${transferido ? "transferido" : (status === "F" ? "falta" : "presente")} ${(!podeEditar || transferido) ? "bloqueado" : ""} ${salvando ? "salvando" : ""}`;
         div.dataset.alunoId = aluno.id;
         div.dataset.statusAtual = status;
 
@@ -1096,20 +1105,36 @@ async function mudarSemana(delta) {
             <div class="aluno-info">
               <strong>Nº ${aluno.numero} - ${aluno.nome}</strong><br>
               <span class="muted">RM: ${aluno.rm || "-"}</span><br>
-              <span class="badge-status">Status atual: ${status === "F" ? "Falta" : "Presente"}</span><br>
-              <span class="muted">${podeEditar ? "Clique no card para alternar presença/falta." : "Somente visualização."}</span>
+              <span class="badge-status">
+                Status atual: ${transferido ? "Transferido" : (status === "F" ? "Falta" : "Presente")}
+              </span><br>
+              <span class="muted">
+                ${
+                  transferido
+                    ? "Aluno transferido/inativo. Não participa da chamada."
+                    : (podeEditar ? "Clique no card para alternar presença/falta." : "Somente visualização.")
+                }
+              </span>
               <div style="margin-top:8px;">
-                ${ultimaLinha}
+                ${transferido ? "" : ultimaLinha}
               </div>
             </div>
           </div>
         `;
+
 
         listaAlunos.appendChild(div);
       });
 
       document.querySelectorAll(".aluno-card").forEach((card) => {
         card.addEventListener("click", () => {
+          const aluno = alunosDaTurma.find((a) => a.id === card.dataset.alunoId);
+
+          if (aluno?.transferido === true) {
+            msgTela.innerText = "Este aluno está marcado como transferido/inativo e não participa da chamada.";
+            return;
+          }
+
           if (!podeEditar) {
             msgTela.innerText = "Você está em modo de visualização e não pode alterar esta chamada.";
             return;
@@ -1127,10 +1152,15 @@ async function mudarSemana(delta) {
           registrarStatus(alunoId, novoStatus);
         });
       });
-    }
 
     function registrarStatus(alunoId, novoStatus) {
       msgTela.innerText = "";
+
+      const aluno = alunosDaTurma.find((a) => a.id === alunoId);
+      if (aluno?.transferido === true) {
+        msgTela.innerText = "Este aluno está marcado como transferido/inativo e não participa da chamada.";
+        return;
+      }
 
       if (!podeEditar) {
         msgTela.innerText = "Você está em modo de visualização e não pode alterar esta chamada.";
