@@ -55,6 +55,12 @@
       background: #fff;
     }
 
+    .aluno-item.transferido {
+        background: #eeeeee;
+        border-color: #c8c8c8;
+        color: #777;
+      }
+
     .muted {
       color: #666;
       font-size: 14px;
@@ -249,7 +255,7 @@
 
       const { data, error } = await supabase
         .from("alunos")
-        .select("id, numero, nome, rm")
+        .select("id, numero, nome, rm, transferido")
         .eq("turma_id", turmaAtual.id)
         .order("numero", { ascending: true });
 
@@ -268,10 +274,11 @@
 
       data.forEach((aluno) => {
         const div = document.createElement("div");
-        div.className = "aluno-item";
+        div.className = `aluno-item ${aluno.transferido ? "transferido" : ""}`;
         div.innerHTML = `
           <strong>Nº ${aluno.numero} - ${aluno.nome}</strong><br>
-          <span class="muted">RM: ${aluno.rm || "-"}</span>
+          <span class="muted">RM: ${aluno.rm || "-"}</span><br>
+          ${aluno.transferido ? `<span class="muted">Aluno transferido/inativo</span>` : ""}
         `;
         listaAlunos.appendChild(div);
       });
@@ -296,8 +303,10 @@
             turma_id: turmaAtual.id,
             numero: numero,
             nome: nome,
-            rm: rm || null
+            rm: rm || null,
+            transferido: false
           }
+
         ]);
 
       if (error) {
@@ -322,6 +331,22 @@
         .toLowerCase()
         .trim();
     }
+
+    function detectarTransferidoPorLancamento(valor) {
+      const texto = String(valor || "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toUpperCase()
+        .trim();
+
+      if (!texto) return false;
+
+      // Remove espaços e separadores para casos como "I I", "I/I", "I - I"
+      const compacto = texto.replace(/[\s|/\\,;.-]+/g, "");
+
+      return compacto.includes("I");
+    }
+
 
     function encontrarIndiceColuna(headers, candidatos) {
       const normalizados = headers.map(h => normalizarCabecalho(h));
@@ -376,6 +401,7 @@
       let idxNumero = encontrarIndiceColuna(headers, ["Nº", "N°", "N", "No", "Numero"]);
       let idxAluno = encontrarIndiceColuna(headers, ["Aluno", "Nome", "Nome do aluno"]);
       let idxRm = encontrarIndiceColuna(headers, ["RM", "Rm", "Registro"]);
+      let idxLancamento = encontrarIndiceColuna(headers, ["Lançamento", "Lancamento"]);
 
       if (idxNumero === -1 || idxAluno === -1 || idxRm === -1) {
         throw new Error("Não consegui identificar as colunas Nº, Aluno e RM no HTML.");
@@ -392,6 +418,10 @@
         const numeroTexto = (celulas[idxNumero]?.textContent || "").replace(/\s+/g, " ").trim();
         const nomeTexto = (celulas[idxAluno]?.textContent || "").replace(/\s+/g, " ").trim();
         const rmTexto = (celulas[idxRm]?.textContent || "").replace(/\s+/g, " ").trim();
+        const lancamentoTexto =
+          idxLancamento >= 0
+            ? String(celulas[idxLancamento]?.textContent || "").replace(/\s+/g, " ").trim()
+            : "";
 
         const numero = parseInt(String(numeroTexto).replace(/[^\d]/g, ""), 10);
         const nome = String(nomeTexto || "").trim();
@@ -399,11 +429,14 @@
 
         if (!numero || !nome) continue;
 
+        
         mapaAlunos.set(numero, {
           numero,
           nome,
-          rm: rm || null
+          rm: rm || null,
+          transferido: detectarTransferidoPorLancamento(lancamentoTexto)
         });
+
       }
 
       const alunos = Array.from(mapaAlunos.values()).sort((a, b) => a.numero - b.numero);
@@ -478,6 +511,7 @@
       let idxNumero = encontrarIndiceColuna(headers, ["Nº", "N°", "N", "No", "Numero"]);
       let idxAluno = encontrarIndiceColuna(headers, ["Aluno", "Nome", "Nome do aluno"]);
       let idxRm = encontrarIndiceColuna(headers, ["RM", "Rm", "Registro"]);
+      let idxLancamento = encontrarIndiceColuna(headers, ["Lançamento", "Lancamento"]);
 
       if (idxNumero === -1 || idxAluno === -1 || idxRm === -1) {
         throw new Error("Não consegui identificar corretamente as colunas Nº, Aluno e RM.");
@@ -490,6 +524,7 @@
         const numeroTexto = textoCelula(worksheet, r, idxNumero);
         const nomeTexto = textoCelula(worksheet, r, idxAluno);
         const rmTexto = textoCelula(worksheet, r, idxRm);
+        const lancamentoTexto = idxLancamento >= 0 ? textoCelula(worksheet, r, idxLancamento) : "";
 
         if (!numeroTexto && !nomeTexto && !rmTexto) {
           linhasVaziasSeguidas++;
@@ -508,7 +543,8 @@
         mapaAlunos.set(numero, {
           numero,
           nome,
-          rm: rm || null
+          rm: rm || null,
+          transferido: detectarTransferidoPorLancamento(lancamentoTexto)
         });
       }
 
@@ -575,7 +611,8 @@
           turma_id: turmaAtual.id,
           numero: aluno.numero,
           nome: aluno.nome,
-          rm: aluno.rm
+          rm: aluno.rm,
+          transferido: aluno.transferido === true
         }));
 
         const { error } = await supabase
@@ -588,6 +625,23 @@
           console.error("Erro ao importar alunos:", error);
           msgImportacao.innerText = "Erro ao importar planilha: " + error.message;
           return;
+        }
+
+        const numerosImportados = alunosExtraidos.map((aluno) => aluno.numero);
+
+        if (numerosImportados.length > 0) {
+          const { error: erroTransferidos } = await supabase
+            .from("alunos")
+            .update({ transferido: true })
+            .eq("turma_id", turmaAtual.id)
+            .not("numero", "in", `(${numerosImportados.join(",")})`);
+
+          if (erroTransferidos) {
+            console.error("Erro ao marcar alunos ausentes como transferidos:", erroTransferidos);
+            msgImportacao.innerText =
+              "Planilha importada, mas houve erro ao marcar transferidos: " + erroTransferidos.message;
+            return;
+          }
         }
 
         msgImportacao.innerText = `Importação concluída com sucesso! ${payload.length} alunos processados.`;
