@@ -285,9 +285,13 @@
 
       const mapaChamadasHoje = {};
       (chamadasHoje || []).forEach(c => {
-        mapaChamadasHoje[c.turma_id] = c.aula;
+        if (
+          !mapaChamadasHoje[c.turma_id] ||
+          c.aula < mapaChamadasHoje[c.turma_id]
+        ) {
+          mapaChamadasHoje[c.turma_id] = c.aula;
+        }
       });
-
       // 3️⃣ Separar turmas
       const turmasHoje = [];
       const outrasTurmas = [];
@@ -317,7 +321,7 @@
         div.dataset.id = turma.id;
 
         div.addEventListener("click", () => {
-          window.location.href = `chamada.html?id=${turma.id}`;
+          window.location.href = `chamada.html?id=${turma.id}&aula=${turma.aula}`;
         });
 
         div.innerHTML = `
