@@ -297,7 +297,7 @@
       const outrasTurmas = [];
 
       turmas.forEach(turma => {
-        if (mapaChamadasHoje[turma.id]) {
+        if (mapaChamadasHoje.hasOwnProperty(turma.id)) {
           turmasHoje.push({
             ...turma,
             aula: mapaChamadasHoje[turma.id]
@@ -321,7 +321,10 @@
         div.dataset.id = turma.id;
 
         div.addEventListener("click", () => {
-          window.location.href = `chamada.html?id=${turma.id}&aula=${turma.aula}`;
+          
+          const aulaInicial = turma.aula ?? "";
+          window.location.href = `chamada.html?id=${turma.id}${aulaInicial ? `&aula=${aulaInicial}` : ""}`;
+
         });
 
         div.innerHTML = `
