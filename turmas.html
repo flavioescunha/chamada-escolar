@@ -290,9 +290,10 @@
       }
 
       const mapaTurmasPorId = {};
-      (turmas || []).Each((turma) => {
-        mapaTurmasPorId[turma.id] = turma;
-      });
+        (turmas || []).forEach((turma) => {
+          mapaTurmasPorId[turma.id] = turma;
+        });
+
 
       // 3️⃣ Montar turmas do dia SEM agrupar por turma:
       // cada slot do professor vira um item, mesmo que a turma se repita
@@ -352,7 +353,7 @@
             
             ${turma.aula ? `<span class="badge">Aula ${turma.aula}</span>` : ""}
             ${turma.periodo_slot ? `<span class="badge">${turma.periodo_slot}</span>` : ""}
-            <span class="badge">Criada por: ${nomeCriador}</span
+            <span class="badge">Criada por: ${nomeCriador}</span>
 
           </div>
           <div class="acoes">
@@ -373,7 +374,7 @@
       listaTurmas.innerHTML = "";
 
       if (turmasHoje.length === 0) {
-        listaHoje.innerHTML = `<div class="muted">Nenhuma urma atribuída a você hoje.</div>`;
+        listaHoje.innerHTML = `<div class="muted">Nenhuma turma atribuída a você hoje.</div>`;
       } else {
         turmasHoje.forEach(t => renderTurma(t, listaHoje));
       }
