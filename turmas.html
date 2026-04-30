@@ -289,36 +289,34 @@
         console.error(erroSlots);
       }
 
-      const mapaSlotsHoje = {};
-      (slotsHoje || []).forEach((slot) => {
-        const atual = mapaSlotsHoje[slot.turma_id];
-
-        if (!atual || slot.aula < atual.aula) {
-          mapaSlotsHoje[slot.turma_id] = {
-            aula: slot.aula,
-            periodo: slot.periodo
-          };
-        }
+      const mapaTurmasPorId = {};
+      (turmas || []).Each((turma) => {
+        mapaTurmasPorId[turma.id] = turma;
       });
 
-      // 3️⃣ Separar turmas
-      const turmasHoje = [];
-      const outrasTurmas = [];
+      // 3️⃣ Montar turmas do dia SEM agrupar por turma:
+      // cada slot do professor vira um item, mesmo que a turma se repita
+      const turmasHoje = (slotsHoje || [])
+        .map((slot) => {
+          const turma = mapaTurmasPorId[slot.turma_id];
+          if (!turma) return null;
 
-      turmas.forEach((turma) => {
-        if (mapaSlotsHoje.hasOwnProperty(turma.id)) {
-          turmasHoje.push({
+          return {
             ...turma,
-            aula: mapaSlotsHoje[turma.id].aula,
-            periodo_slot: mapaSlotsHoje[turma.id].periodo
-          });
-        } else {
-          outrasTurmas.push(turma);
-        }
-      });
+            aula: slot.aula,
+            periodo_slot: slot.periodo
+          };
+        })
+        .filter(Boolean)
+        .sort((a, b) =>
+          a.aula - b.aula ||
+          a.nome.localeCompare(b.nome) ||
+          String(a.periodo_slot || "").localeCompare(String(b.periodo_slot || ""))
+        );
 
-      // 4️⃣ Ordenar turmas de hoje por aula
-      turmasHoje.sort((a, b) => a.aula - b.aula);
+      // 4️⃣ Demais turmas = as que não aparecem em nenhum slot do dia
+      const turmaIdsHoje = new Set(turmasHoje.map((t) => t.id));
+      const outrasTurmas = (turmas || []).filter((turma) => !turmaIdsHoje.has(turma.id));
 
       // 5️⃣ Render helpers
       function renderTurma(turma, destino) {
@@ -351,8 +349,11 @@
           <div>
             <strong>${turma.nome}</strong><br>
             <span class="muted">Período padrão: ${turma.periodo_padrao || "-"}</span><br>
+            
             ${turma.aula ? `<span class="badge">Aula ${turma.aula}</span>` : ""}
-            <span class="badge">Criada por: ${nomeCriador}</span>
+            ${turma.periodo_slot ? `<span class="badge">${turma.periodo_slot}</span>` : ""}
+            <span class="badge">Criada por: ${nomeCriador}</span
+
           </div>
           <div class="acoes">
             <button class="btnAbrir" data-id="${turma.id}">Configurações</button>
