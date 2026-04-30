@@ -122,7 +122,7 @@
 
   <!-- LISTA DE TURMAS PRIMEIRO -->
   <div class="card">
-    <h3>Turmas com chamada hoje</h3>
+    <h3>Turmas do dia</h3>
     <div id="listaTurmasHoje" class="muted">Carregando...</div>
   </div>
 
@@ -276,35 +276,41 @@
         return;
       }
 
-      // 2️⃣ Buscar chamadas feitas HOJE por ESTE professor
-      const { data: chamadasHoje, error: erroChamadas } = await supabase
-        .from("chamadas")
-        .select("turma_id, aula")
-        .eq("data_chamada", hoje)
-        .eq("criada_por", usuarioAtual.id);
+      // 2️⃣ Buscar slots do dia cujo professor é proprietário
+      const diaSemanaHoje = new Date().getDay();
 
-      if (erroChamadas) {
-        console.error(erroChamadas);
+      const { data: slotsHoje, error: erroSlots } = await supabase
+        .from("propriedade_horario")
+        .select("turma_id, periodo, aula")
+        .eq("professor_id", usuarioAtual.id)
+        .eq("dia_semana", diaSemanaHoje);
+
+      if (erroSlots) {
+        console.error(erroSlots);
       }
 
-      const mapaChamadasHoje = {};
-      (chamadasHoje || []).forEach(c => {
-        if (
-          !mapaChamadasHoje[c.turma_id] ||
-          c.aula < mapaChamadasHoje[c.turma_id]
-        ) {
-          mapaChamadasHoje[c.turma_id] = c.aula;
+      const mapaSlotsHoje = {};
+      (slotsHoje || []).forEach((slot) => {
+        const atual = mapaSlotsHoje[slot.turma_id];
+
+        if (!atual || slot.aula < atual.aula) {
+          mapaSlotsHoje[slot.turma_id] = {
+            aula: slot.aula,
+            periodo: slot.periodo
+          };
         }
       });
+
       // 3️⃣ Separar turmas
       const turmasHoje = [];
       const outrasTurmas = [];
 
-      turmas.forEach(turma => {
-        if (mapaChamadasHoje.hasOwnProperty(turma.id)) {
+      turmas.forEach((turma) => {
+        if (mapaSlotsHoje.hasOwnProperty(turma.id)) {
           turmasHoje.push({
             ...turma,
-            aula: mapaChamadasHoje[turma.id]
+            aula: mapaSlotsHoje[turma.id].aula,
+            periodo_slot: mapaSlotsHoje[turma.id].periodo
           });
         } else {
           outrasTurmas.push(turma);
@@ -325,11 +331,21 @@
         div.dataset.id = turma.id;
 
         div.addEventListener("click", () => {
-          
-          const aulaInicial = turma.aula ?? "";
-          window.location.href = `chamada.html?id=${turma.id}${aulaInicial ? `&aula=${aulaInicial}` : ""}`;
+          const params = new URLSearchParams({
+            id: turma.id
+          });
 
+          if (turma.aula) {
+            params.set("aula", String(turma.aula));
+          }
+
+          if (turma.periodo_slot) {
+            params.set("periodo", turma.periodo_slot);
+          }
+
+          window.location.href = `chamada.html?${params.toString()}`;
         });
+
 
         div.innerHTML = `
           <div>
@@ -356,7 +372,7 @@
       listaTurmas.innerHTML = "";
 
       if (turmasHoje.length === 0) {
-        listaHoje.innerHTML = `<div class="muted">Nenhuma chamada feita hoje.</div>`;
+        listaHoje.innerHTML = `<div class="muted">Nenhuma urma atribuída a você hoje.</div>`;
       } else {
         turmasHoje.forEach(t => renderTurma(t, listaHoje));
       }
