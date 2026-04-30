@@ -56,10 +56,10 @@
     }
 
     .aluno-item.transferido {
-        background: #eeeeee;
-        border-color: #c8c8c8;
-        color: #777;
-      }
+      background: #eeeeee;
+      border-color: #c8c8c8;
+      color: #777;
+    }
 
     .muted {
       color: #666;
@@ -78,8 +78,100 @@
       padding: 10px 16px;
     }
 
+    .linha-mapa-config {
+      display: grid;
+      grid-template-columns: 140px 1fr auto;
+      gap: 10px;
+      align-items: end;
+    }
+
+    #qtdFileiras,
+    #qtdCarteiras {
+      width: 5ch;
+      min-width: 5ch;
+      text-align: center;
+      padding-left: 6px;
+      padding-right: 6px;
+    }
+
+    .mapa-sem-posicao {
+      min-height: 70px;
+      border: 1px dashed #bbb;
+      border-radius: 8px;
+      padding: 10px;
+      margin-top: 12px;
+      margin-bottom: 16px;
+      background: #fafafa;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .mapa-grade {
+      display: grid;
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .fileira-mapa {
+      display: grid;
+      gap: 8px;
+    }
+
+    .carteira-slot {
+      min-height: 72px;
+      border: 1px dashed #bbb;
+      border-radius: 8px;
+      background: #fafafa;
+      padding: 6px;
+      display: flex;
+      align-items: stretch;
+      justify-content: stretch;
+    }
+
+    .carteira-slot.destino-drag {
+      border-color: #4a78c2;
+      background: #eaf2ff;
+      box-shadow:
+        0 0 0 2px rgba(74, 120, 194, 0.18),
+        0 0 10px rgba(74, 120, 194, 0.25);
+    }
+
+    .carteira-slot.destino-drag .card-mapa-aluno {
+      border-color: #4a78c2;
+      background: #f5f9ff;
+      box-shadow: 0 0 10px rgba(74, 120, 194, 0.20);
+    }
+
+    .card-mapa-aluno {
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      background: #fff;
+      padding: 8px;
+      width: 100%;
+      cursor: grab;
+      font-size: 14px;
+      box-sizing: border-box;
+    }
+
+    .card-mapa-aluno.transferido {
+      background: #eeeeee;
+      border-color: #c8c8c8;
+      color: #777;
+    }
+
+    .item-historico-mapa {
+      border-bottom: 1px solid #eee;
+      padding: 8px 0;
+      font-size: 14px;
+    }
+
     @media (max-width: 700px) {
       .linha {
+        grid-template-columns: 1fr;
+      }
+
+      .linha-mapa-config {
         grid-template-columns: 1fr;
       }
     }
@@ -104,6 +196,36 @@
   <div class="card">
     <h3>Alunos da turma</h3>
     <div id="listaAlunos">Carregando...</div>
+  </div>
+
+  <!-- MAPA DA SALA -->
+  <div class="card">
+    <h3>Mapa da sala</h3>
+
+    <div class="linha-mapa-config">
+      <div>
+        <label for="qtdFileiras">Fileiras</label>
+        <input type="number" id="qtdFileiras" min="1" max="20" />
+      </div>
+
+      <div>
+        <label for="qtdCarteiras">Carteiras por fileira</label>
+        <input type="number" id="qtdCarteiras" min="1" max="20" />
+      </div>
+
+      <div style="display:flex; align-items:end; gap:8px; flex-wrap:wrap;">
+        <button id="btnSalvarMapa" class="btn-secundario">Salvar mapa</button>
+        <button id="btnReiniciarMapa" class="btn-secundario">Reiniciar mapa</button>
+      </div>
+    </div>
+
+    <div id="msgMapa" class="mensagem"></div>
+
+    <h4>Disposição da sala</h4>
+    <div id="gradeMapaSala" class="mapa-grade"></div>
+
+    <h4>Últimas 10 alterações</h4>
+    <div id="listaHistoricoMapa" class="muted">Carregando...</div>
   </div>
 
   <!-- IMPORTAÇÃO NO MEIO -->
@@ -150,7 +272,6 @@
   <!-- Biblioteca para ler .xls e .xlsx -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 
-
   <script type="module">
     import { supabase } from "./js/supabase.js";
 
@@ -170,9 +291,23 @@
     const btnImportarPlanilha = document.getElementById("btnImportarPlanilha");
     const msgImportacao = document.getElementById("msgImportacao");
 
+    const qtdFileiras = document.getElementById("qtdFileiras");
+    const qtdCarteiras = document.getElementById("qtdCarteiras");
+
+    const btnSalvarMapa = document.getElementById("btnSalvarMapa");
+    const btnReiniciarMapa = document.getElementById("btnReiniciarMapa");
+    const msgMapa = document.getElementById("msgMapa");
+    const gradeMapaSala = document.getElementById("gradeMapaSala");
+    const listaHistoricoMapa = document.getElementById("listaHistoricoMapa");
+
     let usuarioAtual = null;
     let professorAtual = null;
     let turmaAtual = null;
+
+    let alunosTurmaAtual = [];
+    let configMapaSala = null;
+    let posicoesMapaSala = [];
+    let alunoArrastandoId = null;
 
     function getTurmaIdDaUrl() {
       const params = new URLSearchParams(window.location.search);
@@ -200,10 +335,10 @@
 
     async function carregarProfessor() {
       const { data, error } = await supabase
-      .from("professores")
-      .select("id, nome, email, disciplina, exigir_troca_senha")
-      .eq("id", usuarioAtual.id)
-      .single();
+        .from("professores")
+        .select("id, nome, email, disciplina, exigir_troca_senha")
+        .eq("id", usuarioAtual.id)
+        .single();
 
       if (error) {
         alert("Professor não encontrado.");
@@ -211,7 +346,6 @@
         return false;
       }
 
-      
       professorAtual = data;
 
       if (data.exigir_troca_senha === true) {
@@ -221,7 +355,6 @@
 
       infoProfessor.innerText = `Professor: ${data.nome} | Disciplina: ${data.disciplina || ""}`;
       return true;
-
     }
 
     async function carregarTurma() {
@@ -267,10 +400,12 @@
       }
 
       if (!data || data.length === 0) {
+        alunosTurmaAtual = [];
         listaAlunos.innerHTML = `<div class="muted">Nenhum aluno cadastrado ainda.</div>`;
         return;
       }
 
+      alunosTurmaAtual = data || [];
       listaAlunos.innerHTML = "";
 
       data.forEach((aluno) => {
@@ -282,6 +417,475 @@
           ${aluno.transferido ? `<span class="muted">Aluno transferido/inativo</span>` : ""}
         `;
         listaAlunos.appendChild(div);
+      });
+    }
+
+    async function carregarConfigMapaSala() {
+      const { data, error } = await supabase
+        .from("turma_mapa_config")
+        .select("turma_id, fileiras, carteiras_por_fileira")
+        .eq("turma_id", turmaAtual.id)
+        .maybeSingle();
+
+      if (error) {
+        console.error("Erro ao carregar configuração do mapa:", error);
+        msgMapa.innerText = "Erro ao carregar configuração do mapa: " + error.message;
+        return;
+      }
+
+      configMapaSala = data || null;
+      qtdFileiras.value = configMapaSala?.fileiras || "";
+      qtdCarteiras.value = configMapaSala?.carteiras_por_fileira || "";
+    }
+
+    async function salvarConfigMapaSala() {
+      msgMapa.innerText = "";
+
+      const fileiras = parseInt(qtdFileiras.value, 10);
+      const carteiras = parseInt(qtdCarteiras.value, 10);
+
+      if (!fileiras || !carteiras || fileiras < 1 || carteiras < 1) {
+        msgMapa.innerText = "Informe quantidades válidas de fileiras e carteiras.";
+        return;
+      }
+
+      const { error } = await supabase
+        .from("turma_mapa_config")
+        .upsert([{
+          turma_id: turmaAtual.id,
+          fileiras: fileiras,
+          carteiras_por_fileira: carteiras,
+          atualizado_em: new Date().toISOString()
+        }], {
+          onConflict: "turma_id"
+        });
+
+      if (error) {
+        console.error("Erro ao salvar configuração do mapa:", error);
+        msgMapa.innerText = "Erro ao salvar configuração do mapa: " + error.message;
+        return;
+      }
+
+      
+      msgMapa.innerText = "Configuração do mapa salva com sucesso.";
+      await carregarConfigMapaSala();
+      await carregarPosicoesMapaSala();
+      await preencherMapaSalaAutomaticamente();
+      renderizarMapaSalaConfig();
+
+    }
+
+    async function carregarPosicoesMapaSala() {
+      const { data, error } = await supabase
+        .from("turma_mapa_posicoes")
+        .select("turma_id, aluno_id, fileira, carteira")
+        .eq("turma_id", turmaAtual.id);
+
+      if (error) {
+        console.error("Erro ao carregar posições do mapa:", error);
+        msgMapa.innerText = "Erro ao carregar posições do mapa: " + error.message;
+        return;
+      }
+
+      posicoesMapaSala = data || [];
+    }
+
+    async function preencherMapaSalaAutomaticamente() {
+      if (!configMapaSala) return;
+
+      const fileiras = configMapaSala.fileiras;
+      const carteiras = configMapaSala.carteiras_por_fileira;
+      const capacidade = fileiras * carteiras;
+
+      const alunosAtivos = (alunosTurmaAtual || [])
+        .filter((aluno) => aluno.transferido !== true)
+        .sort((a, b) => a.numero - b.numero);
+
+      if (alunosAtivos.length > capacidade) {
+        msgMapa.innerText =
+          `O mapa comporta ${capacidade} alunos, mas a turma tem ${alunosAtivos.length} alunos ativos. Aumente fileiras/carteiras.`;
+        return;
+      }
+
+      const alunosSemPosicao = alunosAtivos.filter((aluno) => !obterPosicaoAluno(aluno.id));
+      if (alunosSemPosicao.length === 0) return;
+
+      const ocupadas = new Set(
+        (posicoesMapaSala || []).map((p) => `${p.fileira}-${p.carteira}`)
+      );
+
+      const livres = [];
+      for (let f = 1; f <= fileiras; f++) {
+        for (let c = 1; c <= carteiras; c++) {
+          const chave = `${f}-${c}`;
+          if (!ocupadas.has(chave)) {
+            livres.push({ fileira: f, carteira: c });
+          }
+        }
+      }
+
+      const payload = [];
+      for (let i = 0; i < alunosSemPosicao.length; i++) {
+        const lugar = livres[i];
+        if (!lugar) break;
+
+        payload.push({
+          turma_id: turmaAtual.id,
+          aluno_id: alunosSemPosicao[i].id,
+          fileira: lugar.fileira,
+          carteira: lugar.carteira,
+          atualizado_em: new Date().toISOString()
+        });
+      }
+
+      if (payload.length === 0) return;
+
+      const { error } = await supabase
+        .from("turma_mapa_posicoes")
+        .upsert(payload, {
+          onConflict: "turma_id,aluno_id"
+        });
+
+      if (error) {
+        console.error("Erro ao preencher mapa automaticamente:", error);
+        msgMapa.innerText = "Erro ao posicionar automaticamente os alunos: " + error.message;
+        return;
+      }
+
+      await carregarPosicoesMapaSala();
+    }
+
+    async function reiniciarMapaSala() {
+      msgMapa.innerText = "";
+
+      if (!configMapaSala) {
+        msgMapa.innerText = "Salve primeiro a configuração do mapa.";
+        return;
+      }
+
+      const confirmar = confirm(
+        "Deseja reiniciar o mapa e reorganizar os alunos em ordem de chamada?"
+      );
+
+      if (!confirmar) return;
+
+      const { error } = await supabase
+        .from("turma_mapa_posicoes")
+        .delete()
+        .eq("turma_id", turmaAtual.id);
+
+      if (error) {
+        console.error("Erro ao reiniciar mapa:", error);
+        msgMapa.innerText = "Erro ao reiniciar mapa: " + error.message;
+        return;
+      }
+
+      posicoesMapaSala = [];
+      await preencherMapaSalaAutomaticamente();
+      await carregarPosicoesMapaSala();
+      renderizarMapaSalaConfig();
+
+      msgMapa.innerText = "Mapa reiniciado com sucesso.";
+    }
+
+    
+    function obterPosicaoAluno(alunoId) {
+      return posicoesMapaSala.find((p) => p.aluno_id === alunoId) || null;
+    }
+
+    function limparDestaquesMapa() {
+      document.querySelectorAll(".carteira-slot.destino-drag").forEach((slot) => {
+        slot.classList.remove("destino-drag");
+      });
+    }
+
+    function criarCardMapaAluno(aluno) {
+      const div = document.createElement("div");
+      div.className = `card-mapa-aluno ${aluno.transferido ? "transferido" : ""}`;
+      div.draggable = true;
+      div.dataset.alunoId = aluno.id;
+
+      div.innerHTML = `
+        <strong>Nº ${aluno.numero} - ${aluno.nome}</strong><br>
+        <span class="muted">RM: ${aluno.rm || "-"}</span>
+        ${aluno.transferido ? `<br><span class="muted">Transferido/inativo</span>` : ""}
+      `;
+
+      div.addEventListener("dragstart", () => {
+        alunoArrastandoId = aluno.id;
+      });
+
+      div.addEventListener("dragend", () => {
+        alunoArrastandoId = null;
+        limparDestaquesMapa();
+      });
+
+      return div;
+    }
+
+    function configurarDropSlot(slot) {
+      slot.addEventListener("dragover", (e) => {
+        e.preventDefault();
+
+        if (!alunoArrastandoId) return;
+
+        limparDestaquesMapa();
+        slot.classList.add("destino-drag");
+      });
+
+      slot.addEventListener("dragleave", () => {
+        slot.classList.remove("destino-drag");
+      });
+
+      slot.addEventListener("drop", async (e) => {
+        e.preventDefault();
+
+        if (!alunoArrastandoId) return;
+
+        const fileira = parseInt(slot.dataset.fileira, 10);
+        const carteira = parseInt(slot.dataset.carteira, 10);
+
+        limparDestaquesMapa();
+        await moverAlunoNoMapa(alunoArrastandoId, fileira, carteira);
+      });
+    }
+
+    
+    function renderizarMapaSalaConfig() {
+      limparDestaquesMapa();
+      gradeMapaSala.innerHTML = "";
+
+
+      if (!configMapaSala) {
+        gradeMapaSala.innerHTML = `<div class="muted">Salve primeiro a configuração de fileiras e carteiras.</div>`;
+        return;
+      }
+
+      const fileiras = configMapaSala.fileiras;
+      const carteiras = configMapaSala.carteiras_por_fileira;
+
+      const mapaPosicaoPorChave = {};
+      posicoesMapaSala.forEach((p) => {
+        mapaPosicaoPorChave[`${p.fileira}-${p.carteira}`] = p.aluno_id;
+      });
+
+      for (let f = 1; f <= fileiras; f++) {
+        const linha = document.createElement("div");
+        linha.className = "fileira-mapa";
+        linha.style.gridTemplateColumns = `repeat(${carteiras}, 1fr)`;
+
+        for (let c = 1; c <= carteiras; c++) {
+          const slot = document.createElement("div");
+          slot.className = "carteira-slot";
+          slot.dataset.fileira = String(f);
+          slot.dataset.carteira = String(c);
+
+          configurarDropSlot(slot);
+
+          const alunoId = mapaPosicaoPorChave[`${f}-${c}`];
+          if (alunoId) {
+            const aluno = alunosTurmaAtual.find((a) => a.id === alunoId);
+            if (aluno) {
+              slot.appendChild(criarCardMapaAluno(aluno));
+            }
+          }
+
+          linha.appendChild(slot);
+        }
+
+        gradeMapaSala.appendChild(linha);
+      }
+    }
+
+    async function moverAlunoNoMapa(alunoId, novaFileira, novaCarteira) {
+      const aluno = alunosTurmaAtual.find((a) => a.id === alunoId);
+      if (!aluno) return;
+
+      const posicaoAtual = obterPosicaoAluno(alunoId);
+      const ocupante = posicoesMapaSala.find(
+        (p) => p.fileira === novaFileira && p.carteira === novaCarteira
+      );
+
+      if (
+        posicaoAtual &&
+        posicaoAtual.fileira === novaFileira &&
+        posicaoAtual.carteira === novaCarteira
+      ) {
+        return;
+      }
+
+      if (posicaoAtual) {
+        const { error: erroDeleteAtual } = await supabase
+          .from("turma_mapa_posicoes")
+          .delete()
+          .eq("turma_id", turmaAtual.id)
+          .eq("aluno_id", alunoId);
+
+        if (erroDeleteAtual) {
+          console.error("Erro ao remover posição atual do aluno:", erroDeleteAtual);
+          msgMapa.innerText = "Erro ao atualizar posição do aluno.";
+          return;
+        }
+      }
+
+      if (ocupante && ocupante.aluno_id !== alunoId) {
+        if (posicaoAtual) {
+          const { error: erroMoverOcupante } = await supabase
+            .from("turma_mapa_posicoes")
+            .upsert([{
+              turma_id: turmaAtual.id,
+              aluno_id: ocupante.aluno_id,
+              fileira: posicaoAtual.fileira,
+              carteira: posicaoAtual.carteira,
+              atualizado_em: new Date().toISOString()
+            }], {
+              onConflict: "turma_id,aluno_id"
+            });
+
+          if (erroMoverOcupante) {
+            console.error("Erro ao mover ocupante:", erroMoverOcupante);
+            msgMapa.innerText = "Erro ao mover ocupante.";
+            return;
+          }
+        } else {
+          const { error: erroDeleteOcupante } = await supabase
+            .from("turma_mapa_posicoes")
+            .delete()
+            .eq("turma_id", turmaAtual.id)
+            .eq("aluno_id", ocupante.aluno_id);
+
+          if (erroDeleteOcupante) {
+            console.error("Erro ao remover ocupante:", erroDeleteOcupante);
+            msgMapa.innerText = "Erro ao mover ocupante.";
+            return;
+          }
+        }
+      }
+
+      const { error } = await supabase
+        .from("turma_mapa_posicoes")
+        .upsert([{
+          turma_id: turmaAtual.id,
+          aluno_id: alunoId,
+          fileira: novaFileira,
+          carteira: novaCarteira,
+          atualizado_em: new Date().toISOString()
+        }], {
+          onConflict: "turma_id,aluno_id"
+        });
+
+      if (error) {
+        console.error("Erro ao salvar posição do aluno:", error);
+        msgMapa.innerText = "Erro ao salvar posição do aluno: " + error.message;
+        return;
+      }
+
+      const deFileira = posicaoAtual?.fileira ?? null;
+      const deCarteira = posicaoAtual?.carteira ?? null;
+
+      const { error: erroHist } = await supabase
+        .from("turma_mapa_historico")
+        .insert([{
+          turma_id: turmaAtual.id,
+          aluno_id: aluno.id,
+          aluno_nome: aluno.nome,
+          de_fileira: deFileira,
+          de_carteira: deCarteira,
+          para_fileira: novaFileira,
+          para_carteira: novaCarteira,
+          professor_id: usuarioAtual.id,
+          professor_nome: professorAtual.nome
+        }]);
+
+      if (erroHist) {
+        console.error("Erro ao gravar histórico do mapa:", erroHist);
+      }
+
+      await carregarPosicoesMapaSala();
+      await carregarHistoricoMapaSala();
+      renderizarMapaSalaConfig();
+    }
+
+    async function removerAlunoDoMapa(alunoId) {
+      const aluno = alunosTurmaAtual.find((a) => a.id === alunoId);
+      const posicaoAtual = obterPosicaoAluno(alunoId);
+
+      if (!aluno || !posicaoAtual) return;
+
+      const { error } = await supabase
+        .from("turma_mapa_posicoes")
+        .delete()
+        .eq("turma_id", turmaAtual.id)
+        .eq("aluno_id", alunoId);
+
+      if (error) {
+        console.error("Erro ao remover aluno do mapa:", error);
+        msgMapa.innerText = "Erro ao remover aluno do mapa: " + error.message;
+        return;
+      }
+
+      const { error: erroHist } = await supabase
+        .from("turma_mapa_historico")
+        .insert([{
+          turma_id: turmaAtual.id,
+          aluno_id: aluno.id,
+          aluno_nome: aluno.nome,
+          de_fileira: posicaoAtual.fileira,
+          de_carteira: posicaoAtual.carteira,
+          para_fileira: null,
+          para_carteira: null,
+          professor_id: usuarioAtual.id,
+          professor_nome: professorAtual.nome
+        }]);
+
+      if (erroHist) {
+        console.error("Erro ao gravar histórico do mapa:", erroHist);
+      }
+
+      await carregarPosicoesMapaSala();
+      await carregarHistoricoMapaSala();
+      renderizarMapaSalaConfig();
+    }
+
+    async function carregarHistoricoMapaSala() {
+      const { data, error } = await supabase
+        .from("turma_mapa_historico")
+        .select("aluno_nome, de_fileira, de_carteira, para_fileira, para_carteira, professor_nome, criado_em")
+        .eq("turma_id", turmaAtual.id)
+        .order("criado_em", { ascending: false })
+        .limit(10);
+
+      if (error) {
+        console.error("Erro ao carregar histórico do mapa:", error);
+        listaHistoricoMapa.innerHTML = `<div class="mensagem">Erro ao carregar histórico: ${error.message}</div>`;
+        return;
+      }
+
+      if (!data || data.length === 0) {
+        listaHistoricoMapa.innerHTML = `<div class="muted">Nenhuma alteração registrada ainda.</div>`;
+        return;
+      }
+
+      listaHistoricoMapa.innerHTML = "";
+      data.forEach((item) => {
+        const div = document.createElement("div");
+        div.className = "item-historico-mapa";
+
+        const origem = item.de_fileira && item.de_carteira
+          ? `fileira ${item.de_fileira}, carteira ${item.de_carteira}`
+          : "sem posição";
+
+        const destino = item.para_fileira && item.para_carteira
+          ? `fileira ${item.para_fileira}, carteira ${item.para_carteira}`
+          : "sem posição";
+
+        div.innerHTML = `
+          <strong>${item.aluno_nome}</strong><br>
+          <span class="muted">${origem} → ${destino}</span><br>
+          <span class="muted">Por ${item.professor_nome} em ${new Date(item.criado_em).toLocaleString("pt-BR")}</span>
+        `;
+
+        listaHistoricoMapa.appendChild(div);
       });
     }
 
@@ -322,6 +926,11 @@
       rmAluno.value = "";
 
       await carregarAlunos();
+      await carregarConfigMapaSala();
+      await carregarPosicoesMapaSala();
+      await preencherMapaSalaAutomaticamente();
+      await carregarHistoricoMapaSala();
+      renderizarMapaSalaConfig();
     }
 
     function normalizarCabecalho(valor) {
@@ -347,7 +956,6 @@
 
       return compacto.includes("I");
     }
-
 
     function encontrarIndiceColuna(headers, candidatos) {
       const normalizados = headers.map(h => normalizarCabecalho(h));
@@ -380,7 +988,7 @@
 
       return -1;
     }
-    
+
     function getLinhasPrincipaisDaTabela(table) {
       const linhas = [];
 
@@ -455,14 +1063,12 @@
 
         if (!numero || !nome) continue;
 
-        
         mapaAlunos.set(numero, {
           numero,
           nome,
           rm: rm || null,
           transferido: detectarTransferidoPorLancamento(lancamentoTexto)
         });
-
       }
 
       const alunos = Array.from(mapaAlunos.values()).sort((a, b) => a.numero - b.numero);
@@ -674,11 +1280,24 @@
         arquivoPlanilha.value = "";
 
         await carregarAlunos();
+        await carregarConfigMapaSala();
+        await carregarPosicoesMapaSala();
+        await preencherMapaSalaAutomaticamente();
+        await carregarHistoricoMapaSala();
+        renderizarMapaSalaConfig();
       } catch (e) {
         console.error("Erro na leitura/importação:", e);
         msgImportacao.innerText = "Erro ao processar a planilha: " + e.message;
       }
     }
+
+    btnSalvarMapa.addEventListener("click", async () => {
+      await salvarConfigMapaSala();
+    });
+
+    btnReiniciarMapa.addEventListener("click", async () => {
+      await reiniciarMapaSala();
+    });
 
     btnSalvarAluno.addEventListener("click", async () => {
       await salvarAluno();
@@ -708,6 +1327,11 @@
         if (!okTurma) return;
 
         await carregarAlunos();
+        await carregarConfigMapaSala();
+        await carregarPosicoesMapaSala();
+        await preencherMapaSalaAutomaticamente();
+        await carregarHistoricoMapaSala();
+        renderizarMapaSalaConfig();
       } catch (e) {
         console.error("Erro geral em turma.html:", e);
         alert("Erro ao carregar a turma: " + e.message);

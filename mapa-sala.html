@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
-  <title>Chamada Escolar - Chamada</title>
+  <title>Chamada Escolar - Mapa da Sala</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
     body {
@@ -10,25 +10,6 @@
       max-width: 1100px;
       margin: 30px auto;
       padding: 20px;
-    }
-
-    .lista-frame {
-      max-height: 65vh;
-      overflow-y: auto;
-      border: 1px solid #ddd;
-      border-radius: 10px;
-      padding: 12px;
-      background: #fafafa;
-    }
-
-    .topo-fixo-lista {
-      position: sticky;
-      top: 0;
-      background: #fff;
-      z-index: 5;
-      padding-bottom: 8px;
-      margin-bottom: 8px;
-      border-bottom: 1px solid #ddd;
     }
 
     .topo {
@@ -44,6 +25,7 @@
       border-radius: 10px;
       padding: 16px;
       margin-top: 20px;
+      background: #fff;
     }
 
     .linha-filtros {
@@ -92,24 +74,22 @@
       flex-wrap: nowrap;
     }
 
-.btn-semana {
-  min-width: 40px !important;
-  width: 40px;
-  padding: 10px 8px !important;
-  font-weight: bold;
-  border: 1px solid #bbb;
-  background: #f2f2f2;
-  border-radius: 8px;
-  line-height: 1.2;
-  flex: 0 0 auto;
-}
+    .btn-semana {
+      min-width: 40px !important;
+      width: 40px;
+      padding: 10px 8px !important;
+      font-weight: bold;
+      border: 1px solid #bbb;
+      background: #f2f2f2;
+      border-radius: 8px;
+      line-height: 1.2;
+      flex: 0 0 auto;
+    }
 
-
-.btn-semana:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
+    .btn-semana:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
 
     .controles-ocultos {
       display: none;
@@ -165,68 +145,62 @@
       font-size: 14px;
     }
 
-    .aluno-card {
+    .mapa-grade {
+      display: grid;
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .fileira-mapa {
+      display: grid;
+      gap: 8px;
+    }
+
+    .carteira-slot {
+      min-height: 90px;
+      border: 1px dashed #bbb;
+      border-radius: 8px;
+      background: #fafafa;
+      padding: 6px;
+      display: flex;
+      align-items: stretch;
+      justify-content: stretch;
+    }
+
+    .card-mapa-aluno {
       border: 1px solid #ddd;
       border-radius: 10px;
-      padding: 14px;
-      margin-top: 12px;
+      padding: 10px;
       background: #fff;
       transition: background-color 0.15s ease, border-color 0.15s ease;
       cursor: pointer;
+      width: 100%;
+      box-sizing: border-box;
     }
 
-    .aluno-card.transferido {
-        background: #eeeeee;
-        border-color: #c8c8c8;
-        color: #777;
-        cursor: not-allowed;
-      }
-
-    .aluno-card.bloqueado {
-      cursor: not-allowed;
-      opacity: 0.85;
-    }
-
-    .aluno-card.salvando {
-      cursor: wait;
-    }
-
-    .aluno-card.falta {
+    .card-mapa-aluno.falta {
       background: #ffe5e5;
       border-color: #e3a1a1;
     }
 
-    .aluno-card.presente {
+    .card-mapa-aluno.presente {
       background: #ffffff;
     }
 
-    .aluno-topo {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      gap: 12px;
-      flex-wrap: wrap;
+    .card-mapa-aluno.transferido {
+      background: #eeeeee;
+      border-color: #c8c8c8;
+      color: #777;
+      cursor: not-allowed;
     }
 
-    .aluno-info {
-      flex: 1;
-      min-width: 250px;
+    .card-mapa-aluno.bloqueado {
+      cursor: not-allowed;
+      opacity: 0.85;
     }
 
-    .aluno-acoes {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
-
-    .btn-presente {
-      background: #e9f7ef;
-      border: 1px solid #9dd0ad;
-    }
-
-    .btn-falta {
-      background: #fdecec;
-      border: 1px solid #e0a0a0;
+    .card-mapa-aluno.salvando {
+      cursor: wait;
     }
 
     .badge-status {
@@ -237,11 +211,6 @@
       font-size: 13px;
       border: 1px solid #ccc;
       background: #f7f7f7;
-    }
-
-    .sem-alunos {
-      color: #666;
-      padding: 10px 0;
     }
 
     @media (max-width: 900px) {
@@ -265,88 +234,77 @@
 
   <div class="topo">
     <div>
-      <h2>Chamada</h2>
+      <h2>Chamada - Modo mapa</h2>
       <div id="infoTurma" class="muted">Carregando turma...</div>
       <div id="infoProfessor" class="muted">Carregando professor...</div>
       <div id="infoChamada" class="muted">Carregando informações da chamada...</div>
       <div id="infoPermissao" class="muted">Verificando permissões...</div>
     </div>
-
-    
     <div style="display:flex; gap:10px; flex-wrap:wrap;">
-      <button id="btnMapaSala" class="btn-secundario">Modo mapa</button>
+      <button id="btnModoLista" class="btn-secundario">Modo lista</button>
       <button id="btnAtualizar" class="btn-secundario">Atualizar</button>
       <button id="btnVoltar" class="btn-secundario">Voltar para Turmas...</button>
     </div>
-
   </div>
 
   <div class="card">
     <h3>Filtro da chamada</h3>
 
-  <div class="linha-filtros">
-    <div>
-  <label>Data</label>
-  <div class="linha-datas">
-    <button type="button" id="btnSemanaAnterior" class="btn-semana">&lt;</button>
-    <div id="grupoDatas" class="grupo-botoes"></div>
-    <button type="button" id="btnSemanaProxima" class="btn-semana">&gt;</button>
-  </div>
-</div>
+    <div class="linha-filtros">
+      <div>
+        <label>Data</label>
+        <div class="linha-datas">
+          <button type="button" id="btnSemanaAnterior" class="btn-semana"><</button>
+          <div id="grupoDatas" class="grupo-botoes"></div>
+          <button type="button" id="btnSemanaProxima" class="btn-semana">></button>
+        </div>
+      </div>
 
-
-    <div>
-      <label>Aula</label>
-      <div id="grupoAulas" class="grupo-botoes">
-        <button type="button" data-aula="1">1</button>
-        <button type="button" data-aula="2">2</button>
-        <button type="button" data-aula="3">3</button>
-        <button type="button" data-aula="4">4</button>
-        <button type="button" data-aula="5">5</button>
-        <button type="button" data-aula="6">6</button>
-        <button type="button" data-aula="7">7</button>
+      <div>
+        <label>Aula</label>
+        <div id="grupoAulas" class="grupo-botoes">
+          <button type="button" data-aula="1">1</button>
+          <button type="button" data-aula="2">2</button>
+          <button type="button" data-aula="3">3</button>
+          <button type="button" data-aula="4">4</button>
+          <button type="button" data-aula="5">5</button>
+          <button type="button" data-aula="6">6</button>
+          <button type="button" data-aula="7">7</button>
+        </div>
       </div>
     </div>
 
-  </div>
-
-<!-- CONTROLES ORIGINAIS MANTIDOS, MAS ESCONDIDOS -->
-<div class="controles-ocultos">
-  <input type="date" id="dataChamada" />
-
-  <select id="periodoChamada">
-    <option value="Manhã">Manhã</option>
-    <option value="Tarde">Tarde</option>
-    <option value="Noite">Noite</option>
-  </select>
-
-  <select id="aulaChamada">
-    <option value="1">Aula 1</option>
-    <option value="2">Aula 2</option>
-    <option value="3">Aula 3</option>
-    <option value="4">Aula 4</option>
-    <option value="5">Aula 5</option>
-    <option value="6">Aula 6</option>
-    <option value="7">Aula 7</option>
-  </select>
-</div>
+    <div class="controles-ocultos">
+      <input type="date" id="dataChamada" />
+      <select id="periodoChamada">
+        <option value="Manhã">Manhã</option>
+        <option value="Tarde">Tarde</option>
+        <option value="Noite">Noite</option>
+      </select>
+      <select id="aulaChamada">
+        <option value="1">Aula 1</option>
+        <option value="2">Aula 2</option>
+        <option value="3">Aula 3</option>
+        <option value="4">Aula 4</option>
+        <option value="5">Aula 5</option>
+        <option value="6">Aula 6</option>
+        <option value="7">Aula 7</option>
+      </select>
+    </div>
 
     <div class="linha-resumo">
       <div class="resumo-box">
         <div class="muted">Total de alunos</div>
         <div id="resumoTotal" style="font-size:24px; font-weight:bold;">0</div>
       </div>
-
       <div class="resumo-box">
         <div class="muted">Presentes</div>
         <div id="resumoPresentes" style="font-size:24px; font-weight:bold;">0</div>
       </div>
-
       <div class="resumo-box">
         <div class="muted">Faltas</div>
         <div id="resumoFaltas" style="font-size:24px; font-weight:bold;">0</div>
       </div>
-
       <div class="resumo-box">
         <div class="muted">Status da chamada</div>
         <div id="resumoStatus" style="font-size:18px; font-weight:bold;">Não criada</div>
@@ -357,12 +315,8 @@
   </div>
 
   <div class="card">
-    <div class="topo-fixo-lista">
-      <h3 style="margin: 0;">Alunos</h3>
-    </div>
-    <div class="lista-frame">
-      <div id="listaAlunos">Carregando...</div>
-    </div>
+    <h3>Mapa da sala</h3>
+    <div id="mapaSala" class="mapa-grade"></div>
   </div>
 
   <script type="module">
@@ -373,11 +327,9 @@
     const infoChamada = document.getElementById("infoChamada");
     const infoPermissao = document.getElementById("infoPermissao");
 
-    
-    const btnMapaSala = document.getElementById("btnMapaSala");
+    const btnModoLista = document.getElementById("btnModoLista");
     const btnAtualizar = document.getElementById("btnAtualizar");
-    const btnVoltar = document.getElementById("btnVoltar")
-
+    const btnVoltar = document.getElementById("btnVoltar");
 
     const dataChamadaInput = document.getElementById("dataChamada");
     const periodoChamadaSelect = document.getElementById("periodoChamada");
@@ -385,7 +337,6 @@
 
     const grupoDatas = document.getElementById("grupoDatas");
     const grupoAulas = document.getElementById("grupoAulas");
-
     const btnSemanaAnterior = document.getElementById("btnSemanaAnterior");
     const btnSemanaProxima = document.getElementById("btnSemanaProxima");
 
@@ -395,20 +346,24 @@
     const resumoStatus = document.getElementById("resumoStatus");
 
     const msgTela = document.getElementById("msgTela");
-    const listaAlunos = document.getElementById("listaAlunos");
+    const mapaSala = document.getElementById("mapaSala");
 
     let usuarioAtual = null;
     let professorAtual = null;
     let turmaAtual = null;
+
     let alunosDaTurma = [];
+    let configMapaSala = null;
+    let posicoesMapaSala = [];
 
     let chamadaAtual = null;
     let presencasMap = {};
     let ultimaAlteracaoMap = {};
     let salvandoMap = {};
-
     let propriedadeHorarioAtual = null;
     let podeEditar = true;
+
+    let deslocamentoSemana = 0;
 
     function getTurmaIdDaUrl() {
       const params = new URLSearchParams(window.location.search);
@@ -428,57 +383,6 @@
       return `${ano}-${mes}-${dia}`;
     }
 
-    let deslocamentoSemana = 0;
-
-function formatarIsoLocal(data) {
-  const ano = data.getFullYear();
-  const mes = String(data.getMonth() + 1).padStart(2, "0");
-  const dia = String(data.getDate()).padStart(2, "0");
-  return `${ano}-${mes}-${dia}`;
-}
-
-function adicionarDias(data, quantidade) {
-  const d = new Date(data);
-  d.setDate(d.getDate() + quantidade);
-  return d;
-}
-
-function obterSegundaDaSemana(data) {
-  const diaSemana = data.getDay(); // 0=domingo, 1=segunda, ..., 6=sábado
-  const deslocamentoParaSegunda = diaSemana === 0 ? -6 : 1 - diaSemana;
-  return adicionarDias(data, deslocamentoParaSegunda);
-}
-
-function obterDataInicialSelecionada() {
-  const hoje = parseDataLocal(dataHojeISO());
-  const diaSemana = hoje.getDay();
-
-  if (diaSemana === 6) {
-    // sábado -> sexta
-    return formatarIsoLocal(adicionarDias(hoje, -1));
-  }
-
-  if (diaSemana === 0) {
-    // domingo -> sexta
-    return formatarIsoLocal(adicionarDias(hoje, -2));
-  }
-
-  return formatarIsoLocal(hoje);
-}
-
-function definirPeriodoInicialPeloHorario() {
-  const agora = new Date();
-  const minutos = agora.getHours() * 60 + agora.getMinutes();
-
-  if (minutos >= 19 * 60 + 30) {
-    periodoChamadaSelect.value = "Noite";
-  } else if (minutos >= 12 * 60 + 30) {
-    periodoChamadaSelect.value = "Tarde";
-  } else {
-    periodoChamadaSelect.value = "Manhã";
-  }
-}
-
     function parseDataLocal(iso) {
       if (!iso) return null;
       const partes = iso.split("-");
@@ -492,10 +396,37 @@ function definirPeriodoInicialPeloHorario() {
       return new Date(ano, mes - 1, dia);
     }
 
+    function formatarIsoLocal(data) {
+      const ano = data.getFullYear();
+      const mes = String(data.getMonth() + 1).padStart(2, "0");
+      const dia = String(data.getDate()).padStart(2, "0");
+      return `${ano}-${mes}-${dia}`;
+    }
+
+    function adicionarDias(data, quantidade) {
+      const d = new Date(data);
+      d.setDate(d.getDate() + quantidade);
+      return d;
+    }
+
+    function obterSegundaDaSemana(data) {
+      const diaSemana = data.getDay();
+      const deslocamentoParaSegunda = diaSemana === 0 ? -6 : 1 - diaSemana;
+      return adicionarDias(data, deslocamentoParaSegunda);
+    }
+
+    function obterDataInicialSelecionada() {
+      const hoje = parseDataLocal(dataHojeISO());
+      const diaSemana = hoje.getDay();
+      if (diaSemana === 6) return formatarIsoLocal(adicionarDias(hoje, -1));
+      if (diaSemana === 0) return formatarIsoLocal(adicionarDias(hoje, -2));
+      return formatarIsoLocal(hoje);
+    }
+
     function getDiaSemanaDaDataSelecionada() {
       const data = parseDataLocal(dataChamadaInput.value);
       if (!data) return null;
-      return data.getDay(); // 0 domingo ... 6 sábado
+      return data.getDay();
     }
 
     function getNomeDiaSemana(numero) {
@@ -512,104 +443,95 @@ function definirPeriodoInicialPeloHorario() {
     }
 
     function formatarLabelCurtaData(iso) {
-  const data = parseDataLocal(iso);
-  if (!data) return iso;
-
-  const dias = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
-  const diaSemana = dias[data.getDay()];
-  const dia = String(data.getDate()).padStart(2, "0");
-  const mes = String(data.getMonth() + 1).padStart(2, "0");
-
-  return `${diaSemana}\n${dia}/${mes}`;
-}
-
-function montarBotoesDatas() {
-  grupoDatas.innerHTML = "";
-
-  const hojeReal = parseDataLocal(dataHojeISO());
-  const segundaSemanaAtual = obterSegundaDaSemana(hojeReal);
-  const segundaSemanaExibida = adicionarDias(segundaSemanaAtual, deslocamentoSemana * 7);
-
-  for (let i = 0; i < 5; i++) {
-    const d = adicionarDias(segundaSemanaExibida, i);
-    const iso = formatarIsoLocal(d);
-
-    const botao = document.createElement("button");
-    botao.type = "button";
-    botao.className = "botao-data";
-    botao.dataset.data = iso;
-
-    const linhas = formatarLabelCurtaData(iso).split("\n");
-    botao.innerHTML = `${linhas[0]}<br>${linhas[1]}`;
-
-    botao.addEventListener("click", async () => {
-      dataChamadaInput.value = iso;
-      sincronizarBotoesComControles();
-      await autoCarregarSePronto();
-    });
-
-    grupoDatas.appendChild(botao);
-  }
-
-  const datasVisiveis = Array.from(grupoDatas.querySelectorAll("button")).map(btn => btn.dataset.data);
-
-  if (!datasVisiveis.includes(dataChamadaInput.value)) {
-    if (deslocamentoSemana === 0) {
-      dataChamadaInput.value = obterDataInicialSelecionada();
-    } else {
-      dataChamadaInput.value = datasVisiveis[0];
+      const data = parseDataLocal(iso);
+      if (!data) return iso;
+      const dias = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+      const diaSemana = dias[data.getDay()];
+      const dia = String(data.getDate()).padStart(2, "0");
+      const mes = String(data.getMonth() + 1).padStart(2, "0");
+      return `${diaSemana}\n${dia}/${mes}`;
     }
-  }
 
-  btnSemanaProxima.disabled = deslocamentoSemana >= 0;
+    function montarBotoesDatas() {
+      grupoDatas.innerHTML = "";
 
-  sincronizarBotoesComControles();
-}
+      const hojeReal = parseDataLocal(dataHojeISO());
+      const segundaSemanaAtual = obterSegundaDaSemana(hojeReal);
+      const segundaSemanaExibida = adicionarDias(segundaSemanaAtual, deslocamentoSemana * 7);
 
-function sincronizarBotoesComControles() {
-  document.querySelectorAll("#grupoDatas button").forEach((btn) => {
-    btn.classList.toggle("ativo", btn.dataset.data === dataChamadaInput.value);
-  });
+      for (let i = 0; i < 5; i++) {
+        const d = adicionarDias(segundaSemanaExibida, i);
+        const iso = formatarIsoLocal(d);
 
-  
+        const botao = document.createElement("button");
+        botao.type = "button";
+        botao.className = "botao-data";
+        botao.dataset.data = iso;
 
-  document.querySelectorAll("#grupoAulas button").forEach((btn) => {
-    btn.classList.toggle("ativo", btn.dataset.aula === aulaChamadaSelect.value);
-  });
-}
+        const linhas = formatarLabelCurtaData(iso).split("\n");
+        botao.innerHTML = `${linhas[0]}<br>${linhas[1]}`;
 
-function ligarBotoesAulas() {
-  document.querySelectorAll("#grupoAulas button").forEach((btn) => {
-    btn.addEventListener("click", async () => {
-      aulaChamadaSelect.value = btn.dataset.aula;
+        botao.addEventListener("click", async () => {
+          dataChamadaInput.value = iso;
+          sincronizarBotoesComControles();
+          await autoCarregarSePronto();
+        });
+
+        grupoDatas.appendChild(botao);
+      }
+
+      const datasVisiveis = Array.from(grupoDatas.querySelectorAll("button")).map(btn => btn.dataset.data);
+
+      if (!datasVisiveis.includes(dataChamadaInput.value)) {
+        if (deslocamentoSemana === 0) {
+          dataChamadaInput.value = obterDataInicialSelecionada();
+        } else {
+          dataChamadaInput.value = datasVisiveis[0];
+        }
+      }
+
+      btnSemanaProxima.disabled = deslocamentoSemana >= 0;
       sincronizarBotoesComControles();
+    }
+
+    function sincronizarBotoesComControles() {
+      document.querySelectorAll("#grupoDatas button").forEach((btn) => {
+        btn.classList.toggle("ativo", btn.dataset.data === dataChamadaInput.value);
+      });
+
+      document.querySelectorAll("#grupoAulas button").forEach((btn) => {
+        btn.classList.toggle("ativo", btn.dataset.aula === aulaChamadaSelect.value);
+      });
+    }
+
+    function ligarBotoesAulas() {
+      document.querySelectorAll("#grupoAulas button").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          aulaChamadaSelect.value = btn.dataset.aula;
+          sincronizarBotoesComControles();
+          await autoCarregarSePronto();
+        });
+      });
+    }
+
+    async function autoCarregarSePronto() {
+      if (!turmaAtual || !professorAtual || !alunosDaTurma.length) return;
+      await carregarTelaMapa();
+    }
+
+    async function mudarSemana(delta) {
+      const novoDeslocamento = deslocamentoSemana + delta;
+      if (novoDeslocamento > 0) return;
+
+      const dataAtualSelecionada = parseDataLocal(dataChamadaInput.value) || parseDataLocal(obterDataInicialSelecionada());
+      const novaDataSelecionada = adicionarDias(dataAtualSelecionada, delta * 7);
+
+      deslocamentoSemana = novoDeslocamento;
+      dataChamadaInput.value = formatarIsoLocal(novaDataSelecionada);
+
+      montarBotoesDatas();
       await autoCarregarSePronto();
-    });
-  });
-}
-
-async function autoCarregarSePronto() {
-  if (!turmaAtual || !professorAtual || !alunosDaTurma.length) return;
-  await carregarTelaChamada();
-}
-
-
-async function mudarSemana(delta) {
-  const novoDeslocamento = deslocamentoSemana + delta;
-
-  // não pode ir para o futuro
-  if (novoDeslocamento > 0) return;
-
-  const dataAtualSelecionada = parseDataLocal(dataChamadaInput.value) || parseDataLocal(obterDataInicialSelecionada());
-  const novaDataSelecionada = adicionarDias(dataAtualSelecionada, delta * 7);
-
-  deslocamentoSemana = novoDeslocamento;
-  dataChamadaInput.value = formatarIsoLocal(novaDataSelecionada);
-
-  montarBotoesDatas();
-  await autoCarregarSePronto();
-}
-
+    }
 
     function aplicarParametrosDaUrl() {
       const periodoUrl = getParametroUrl("periodo");
@@ -632,7 +554,6 @@ async function mudarSemana(delta) {
       }
 
       sincronizarBotoesComControles();
-
     }
 
     function getChaveHorarioAtual() {
@@ -712,10 +633,15 @@ async function mudarSemana(delta) {
       turmaAtual = data;
       infoTurma.innerText = `Turma: ${data.nome} | Período padrão: ${data.periodo_padrao || "-"}`;
 
-      periodoChamadaSelect.value = data.periodo_padrao || "Manhã";
+      if (!dataChamadaInput.value) {
+        dataChamadaInput.value = obterDataInicialSelecionada();
+      }
+
+      if (!periodoChamadaSelect.value) {
+        periodoChamadaSelect.value = data.periodo_padrao || "Manhã";
+      }
 
       sincronizarBotoesComControles();
-
       return true;
     }
 
@@ -728,11 +654,44 @@ async function mudarSemana(delta) {
 
       if (error) {
         console.error(error);
-        listaAlunos.innerHTML = `<div class="mensagem">Erro ao carregar alunos: ${error.message}</div>`;
+        msgTela.innerText = "Erro ao carregar alunos: " + error.message;
         return false;
       }
 
       alunosDaTurma = data || [];
+      return true;
+    }
+
+    async function carregarConfigMapaSala() {
+      const { data, error } = await supabase
+        .from("turma_mapa_config")
+        .select("turma_id, fileiras, carteiras_por_fileira")
+        .eq("turma_id", turmaAtual.id)
+        .maybeSingle();
+
+      if (error) {
+        console.error(error);
+        msgTela.innerText = "Erro ao carregar configuração do mapa: " + error.message;
+        return false;
+      }
+
+      configMapaSala = data || null;
+      return true;
+    }
+
+    async function carregarPosicoesMapaSala() {
+      const { data, error } = await supabase
+        .from("turma_mapa_posicoes")
+        .select("turma_id, aluno_id, fileira, carteira")
+        .eq("turma_id", turmaAtual.id);
+
+      if (error) {
+        console.error(error);
+        msgTela.innerText = "Erro ao carregar posições do mapa: " + error.message;
+        return false;
+      }
+
+      posicoesMapaSala = data || [];
       return true;
     }
 
@@ -785,10 +744,9 @@ async function mudarSemana(delta) {
 
       return data || [];
     }
-    
+
     async function obterOuCriarChamada() {
       const existente = await buscarChamadaExistente();
-
       if (existente) {
         return existente;
       }
@@ -807,7 +765,6 @@ async function mudarSemana(delta) {
 
       if (error) {
         console.error("Erro ao criar chamada:", error);
-
         const chamadaDepois = await buscarChamadaExistente();
         if (chamadaDepois) return chamadaDepois;
 
@@ -820,7 +777,6 @@ async function mudarSemana(delta) {
 
     async function buscarPropriedadeHorario() {
       const chave = getChaveHorarioAtual();
-
       if (chave.dia_semana === null) {
         return null;
       }
@@ -920,7 +876,6 @@ async function mudarSemana(delta) {
         console.error("Erro ao registrar propriedade do horário:", error);
 
         propriedade = await buscarPropriedadeHorario();
-
         if (propriedade) {
           propriedadeHorarioAtual = propriedade;
           atualizarInfoPermissao();
@@ -942,125 +897,120 @@ async function mudarSemana(delta) {
     }
 
     async function carregarPresencasEHistorico() {
-  chamadaAtual = await buscarChamadaExistente();
-  presencasMap = {};
-  ultimaAlteracaoMap = {};
-  salvandoMap = {};
+      chamadaAtual = await buscarChamadaExistente();
+      presencasMap = {};
+      ultimaAlteracaoMap = {};
+      salvandoMap = {};
 
-  const chamadasRelevantes = await buscarChamadasAteAulaAtual();
+      const chamadasRelevantes = await buscarChamadasAteAulaAtual();
 
-  if (!chamadaAtual) {
-    if (chamadasRelevantes.length === 0) {
-      infoChamada.innerText = "Chamada ainda não criada para esta data/período/aula.";
-      resumoStatus.innerText = "Não criada";
-      renderizarAlunos();
+      if (!chamadaAtual) {
+        if (chamadasRelevantes.length === 0) {
+          infoChamada.innerText = "Chamada ainda não criada para esta data/período/aula.";
+          resumoStatus.innerText = "Não criada";
+          renderizarMapa();
+          atualizarResumo();
+          return;
+        } else {
+          infoChamada.innerText =
+            "Chamada desta aula ainda não criada. Exibindo status herdado das aulas anteriores deste período.";
+          resumoStatus.innerText = "Herdada";
+        }
+      } else {
+        infoChamada.innerText = `Chamada carregada | Data: ${chamadaAtual.data_chamada} | Período: ${chamadaAtual.periodo} | Aula: ${chamadaAtual.aula}`;
+        resumoStatus.innerText = "Criada";
+      }
+
+      const chamadaIds = chamadasRelevantes.map(c => c.id);
+
+      if (chamadaIds.length === 0) {
+        renderizarMapa();
+        atualizarResumo();
+        return;
+      }
+
+      const mapaAulaPorChamada = {};
+      chamadasRelevantes.forEach((c) => {
+        mapaAulaPorChamada[c.id] = c.aula;
+      });
+
+      const { data: presencas, error: erroPresencas } = await supabase
+        .from("presencas")
+        .select("id, chamada_id, aluno_id, status, atualizado_em")
+        .in("chamada_id", chamadaIds);
+
+      if (erroPresencas) {
+        console.error("Erro ao carregar presenças:", erroPresencas);
+        msgTela.innerText = "Erro ao carregar presenças: " + erroPresencas.message;
+        return;
+      }
+
+      const ultimoStatusPorAluno = {};
+      (presencas || []).forEach((item) => {
+        const aula = mapaAulaPorChamada[item.chamada_id] || 0;
+
+        if (
+          !ultimoStatusPorAluno[item.aluno_id] ||
+          aula > ultimoStatusPorAluno[item.aluno_id].aula ||
+          (
+            aula === ultimoStatusPorAluno[item.aluno_id].aula &&
+            String(item.atualizado_em || "") > String(ultimoStatusPorAluno[item.aluno_id].atualizado_em || "")
+          )
+        ) {
+          ultimoStatusPorAluno[item.aluno_id] = {
+            status: item.status,
+            aula: aula,
+            atualizado_em: item.atualizado_em
+          };
+        }
+      });
+
+      Object.keys(ultimoStatusPorAluno).forEach((alunoId) => {
+        presencasMap[alunoId] = ultimoStatusPorAluno[alunoId].status;
+      });
+
+      const { data: historico, error: erroHistorico } = await supabase
+        .from("historico_alteracoes")
+        .select("chamada_id, aluno_id, professor_nome, disciplina, acao, status_resultante, criado_em")
+        .in("chamada_id", chamadaIds)
+        .order("criado_em", { ascending: false });
+
+      if (erroHistorico) {
+        console.error("Erro ao carregar histórico:", erroHistorico);
+        msgTela.innerText = "Erro ao carregar histórico: " + erroHistorico.message;
+        return;
+      }
+
+      const ultimaAlteracaoPorAluno = {};
+      (historico || []).forEach((item) => {
+        const aula = mapaAulaPorChamada[item.chamada_id] || 0;
+
+        if (
+          !ultimaAlteracaoPorAluno[item.aluno_id] ||
+          aula > ultimaAlteracaoPorAluno[item.aluno_id].aula ||
+          (
+            aula === ultimaAlteracaoPorAluno[item.aluno_id].aula &&
+            String(item.criado_em || "") > String(ultimaAlteracaoPorAluno[item.aluno_id].criado_em || "")
+          )
+        ) {
+          ultimaAlteracaoPorAluno[item.aluno_id] = {
+            ...item,
+            aula
+          };
+        }
+      });
+
+      Object.keys(ultimaAlteracaoPorAluno).forEach((alunoId) => {
+        ultimaAlteracaoMap[alunoId] = ultimaAlteracaoPorAluno[alunoId];
+      });
+
+      renderizarMapa();
       atualizarResumo();
-      return;
-    } else {
-      infoChamada.innerText =
-        "Chamada desta aula ainda não criada. Exibindo status herdado das aulas anteriores deste período.";
-      resumoStatus.innerText = "Herdada";
     }
-  } else {
-    infoChamada.innerText = `Chamada carregada | Data: ${chamadaAtual.data_chamada} | Período: ${chamadaAtual.periodo} | Aula: ${chamadaAtual.aula}`;
-    resumoStatus.innerText = "Criada";
-  }
-
-  const chamadaIds = chamadasRelevantes.map(c => c.id);
-
-  if (chamadaIds.length === 0) {
-    renderizarAlunos();
-    atualizarResumo();
-    return;
-  }
-
-  const mapaAulaPorChamada = {};
-  chamadasRelevantes.forEach((c) => {
-    mapaAulaPorChamada[c.id] = c.aula;
-  });
-
-  const { data: presencas, error: erroPresencas } = await supabase
-    .from("presencas")
-    .select("id, chamada_id, aluno_id, status, atualizado_em")
-    .in("chamada_id", chamadaIds);
-
-  if (erroPresencas) {
-    console.error("Erro ao carregar presenças:", erroPresencas);
-    msgTela.innerText = "Erro ao carregar presenças: " + erroPresencas.message;
-    return;
-  }
-
-  // Regra: vale o último status do aluno no mesmo dia/período até a aula atual
-  const ultimoStatusPorAluno = {};
-
-  (presencas || []).forEach((item) => {
-    const aula = mapaAulaPorChamada[item.chamada_id] || 0;
-
-    if (
-      !ultimoStatusPorAluno[item.aluno_id] ||
-      aula > ultimoStatusPorAluno[item.aluno_id].aula ||
-      (
-        aula === ultimoStatusPorAluno[item.aluno_id].aula &&
-        String(item.atualizado_em || "") > String(ultimoStatusPorAluno[item.aluno_id].atualizado_em || "")
-      )
-    ) {
-      ultimoStatusPorAluno[item.aluno_id] = {
-        status: item.status,
-        aula: aula,
-        atualizado_em: item.atualizado_em
-      };
-    }
-  });
-
-  Object.keys(ultimoStatusPorAluno).forEach((alunoId) => {
-    presencasMap[alunoId] = ultimoStatusPorAluno[alunoId].status;
-  });
-
-  const { data: historico, error: erroHistorico } = await supabase
-    .from("historico_alteracoes")
-    .select("chamada_id, aluno_id, professor_nome, disciplina, acao, status_resultante, criado_em")
-    .in("chamada_id", chamadaIds)
-    .order("criado_em", { ascending: false });
-
-  if (erroHistorico) {
-    console.error("Erro ao carregar histórico:", erroHistorico);
-    msgTela.innerText = "Erro ao carregar histórico: " + erroHistorico.message;
-    return;
-  }
-
-  const ultimaAlteracaoPorAluno = {};
-
-  (historico || []).forEach((item) => {
-    const aula = mapaAulaPorChamada[item.chamada_id] || 0;
-
-    if (
-      !ultimaAlteracaoPorAluno[item.aluno_id] ||
-      aula > ultimaAlteracaoPorAluno[item.aluno_id].aula ||
-      (
-        aula === ultimaAlteracaoPorAluno[item.aluno_id].aula &&
-        String(item.criado_em || "") > String(ultimaAlteracaoPorAluno[item.aluno_id].criado_em || "")
-      )
-    ) {
-      ultimaAlteracaoPorAluno[item.aluno_id] = {
-        ...item,
-        aula
-      };
-    }
-  });
-
-  Object.keys(ultimaAlteracaoPorAluno).forEach((alunoId) => {
-    ultimaAlteracaoMap[alunoId] = ultimaAlteracaoPorAluno[alunoId];
-  });
-
-  renderizarAlunos();
-  atualizarResumo();
-}
-
 
     function atualizarResumo() {
       const alunosAtivos = alunosDaTurma.filter((aluno) => aluno.transferido !== true);
       const total = alunosAtivos.length;
-
       let faltas = 0;
 
       alunosAtivos.forEach((aluno) => {
@@ -1074,90 +1024,112 @@ async function mudarSemana(delta) {
       resumoPresentes.innerText = presentes;
       resumoFaltas.innerText = faltas;
     }
-        function renderizarAlunos() {
-      if (!alunosDaTurma || alunosDaTurma.length === 0) {
-        listaAlunos.innerHTML = `<div class="sem-alunos">Nenhum aluno cadastrado nesta turma.</div>`;
+
+    function criarCardMapaAluno(aluno) {
+      const status = presencasMap[aluno.id] || "C";
+      const ultima = ultimaAlteracaoMap[aluno.id];
+      const salvando = salvandoMap[aluno.id] === true;
+      const transferido = aluno.transferido === true;
+
+      const div = document.createElement("div");
+      div.className = `card-mapa-aluno ${transferido ? "transferido" : (status === "F" ? "falta" : "presente")} ${(!podeEditar || transferido) ? "bloqueado" : ""} ${salvando ? "salvando" : ""}`;
+      div.dataset.alunoId = aluno.id;
+      div.dataset.statusAtual = status;
+
+      let ultimaLinha = `<div class="muted">Nenhuma alteração registrada ainda.</div>`;
+
+      if (salvando) {
+        ultimaLinha = `<div class="muted">Salvando alteração...</div>`;
+      } else if (ultima) {
+        const acaoLegivel = ultima.acao === "marcou_falta" ? "marcou falta" : "retirou falta";
+        ultimaLinha = `
+          <div class="muted">
+            Última alteração: ${ultima.professor_nome || "Professor"} (${ultima.disciplina || "-"}) ${acaoLegivel}
+          </div>
+        `;
+      }
+
+      div.innerHTML = `
+        <strong>Nº ${aluno.numero} - ${aluno.nome}</strong><br>
+        <span class="muted">RM: ${aluno.rm || "-"}</span><br>
+        <span class="badge-status">
+          Status atual: ${transferido ? "Transferido" : (status === "F" ? "Falta" : "Presente")}
+        </span><br>
+        <span class="muted">
+          ${
+            transferido
+              ? "Aluno transferido/inativo. Não participa da chamada."
+              : (podeEditar ? "Clique no card para alternar presença/falta." : "Somente visualização.")
+          }
+        </span>
+        <div style="margin-top:8px;">
+          ${transferido ? "" : ultimaLinha}
+        </div>
+      `;
+
+      div.addEventListener("click", () => {
+        if (transferido) {
+          msgTela.innerText = "Este aluno está marcado como transferido/inativo e não participa da chamada.";
+          return;
+        }
+
+        if (!podeEditar) {
+          msgTela.innerText = "Você está em modo de visualização e não pode alterar esta chamada.";
+          return;
+        }
+
+        const alunoId = aluno.id;
+
+        if (salvandoMap[alunoId]) {
+          return;
+        }
+
+        const statusAtual = presencasMap[alunoId] || "C";
+        const novoStatus = statusAtual === "F" ? "C" : "F";
+        registrarStatus(alunoId, novoStatus);
+      });
+
+      return div;
+    }
+
+    function renderizarMapa() {
+      mapaSala.innerHTML = "";
+
+      if (!configMapaSala) {
+        mapaSala.innerHTML = `<div class="muted">Esta turma ainda não tem mapa configurado.</div>`;
         return;
       }
 
-      listaAlunos.innerHTML = "";
+      const fileiras = configMapaSala.fileiras;
+      const carteiras = configMapaSala.carteiras_por_fileira;
 
-      alunosDaTurma.forEach((aluno) => {
-        const status = presencasMap[aluno.id] || "C";
-        const ultima = ultimaAlteracaoMap[aluno.id];
-        const salvando = salvandoMap[aluno.id] === true;
-        const transferido = aluno.transferido === true;
+      const mapaPosicaoPorChave = {};
+      posicoesMapaSala.forEach((p) => {
+        mapaPosicaoPorChave[`${p.fileira}-${p.carteira}`] = p.aluno_id;
+      });
 
-        const div = document.createElement("div");
-        div.className = `aluno-card ${transferido ? "transferido" : (status === "F" ? "falta" : "presente")} ${(!podeEditar || transferido) ? "bloqueado" : ""} ${salvando ? "salvando" : ""}`;
-        div.dataset.alunoId = aluno.id;
-        div.dataset.statusAtual = status;
+      for (let f = 1; f <= fileiras; f++) {
+        const linha = document.createElement("div");
+        linha.className = "fileira-mapa";
+        linha.style.gridTemplateColumns = `repeat(${carteiras}, 1fr)`;
 
-        let ultimaLinha = `<div class="muted">Nenhuma alteração registrada ainda.</div>`;
+        for (let c = 1; c <= carteiras; c++) {
+          const slot = document.createElement("div");
+          slot.className = "carteira-slot";
 
-        if (salvando) {
-          ultimaLinha = `<div class="muted">Salvando alteração...</div>`;
-        } else if (ultima) {
-          const acaoLegivel = ultima.acao === "marcou_falta" ? "marcou falta" : "retirou falta";
-          ultimaLinha = `
-            <div class="muted">
-              Última alteração: ${ultima.professor_nome || "Professor"} (${ultima.disciplina || "-"}) ${acaoLegivel}
-            </div>
-          `;
+          const alunoId = mapaPosicaoPorChave[`${f}-${c}`];
+          if (alunoId) {
+            const aluno = alunosDaTurma.find((a) => a.id === alunoId);
+            if (aluno) {
+              slot.appendChild(criarCardMapaAluno(aluno));
+            }
+          }
+
+          linha.appendChild(slot);
         }
 
-        div.innerHTML = `
-          <div class="aluno-topo">
-            <div class="aluno-info">
-              <strong>Nº ${aluno.numero} - ${aluno.nome}</strong><br>
-              <span class="muted">RM: ${aluno.rm || "-"}</span><br>
-              <span class="badge-status">
-                Status atual: ${transferido ? "Transferido" : (status === "F" ? "Falta" : "Presente")}
-              </span><br>
-              <span class="muted">
-                ${
-                  transferido
-                    ? "Aluno transferido/inativo. Não participa da chamada."
-                    : (podeEditar ? "Clique no card para alternar presença/falta." : "Somente visualização.")
-                }
-              </span>
-              <div style="margin-top:8px;">
-                ${transferido ? "" : ultimaLinha}
-              </div>
-            </div>
-          </div>
-        `;
-
-
-        listaAlunos.appendChild(div);
-      });
-
-      document.querySelectorAll(".aluno-card").forEach((card) => {
-        card.addEventListener("click", () => {
-          const aluno = alunosDaTurma.find((a) => a.id === card.dataset.alunoId);
-
-          if (aluno?.transferido === true) {
-            msgTela.innerText = "Este aluno está marcado como transferido/inativo e não participa da chamada.";
-            return;
-          }
-
-          if (!podeEditar) {
-            msgTela.innerText = "Você está em modo de visualização e não pode alterar esta chamada.";
-            return;
-          }
-
-          const alunoId = card.dataset.alunoId;
-
-          if (salvandoMap[alunoId]) {
-            return;
-          }
-
-          const statusAtual = card.dataset.statusAtual || "C";
-          const novoStatus = statusAtual === "F" ? "C" : "F";
-
-          registrarStatus(alunoId, novoStatus);
-        });
-      });
+        mapaSala.appendChild(linha);
+      }
     }
 
     function registrarStatus(alunoId, novoStatus) {
@@ -1188,10 +1160,8 @@ async function mudarSemana(delta) {
       const statusAnterior = statusAtual;
       const ultimaAnterior = ultimaAlteracaoMap[alunoId];
 
-      // Atualização otimista
       presencasMap[alunoId] = novoStatus;
       salvandoMap[alunoId] = true;
-
       ultimaAlteracaoMap[alunoId] = {
         professor_nome: professorAtual.nome,
         disciplina: professorAtual.disciplina,
@@ -1200,7 +1170,7 @@ async function mudarSemana(delta) {
         criado_em: new Date().toISOString()
       };
 
-      renderizarAlunos();
+      renderizarMapa();
       atualizarResumo();
 
       (async () => {
@@ -1208,7 +1178,6 @@ async function mudarSemana(delta) {
           await registrarPropriedadeSeNecessario();
 
           const chamada = await obterOuCriarChamada();
-
           if (!chamada) {
             throw new Error("Não foi possível obter ou criar a chamada.");
           }
@@ -1218,15 +1187,13 @@ async function mudarSemana(delta) {
 
           const { error: erroPresenca } = await supabase
             .from("presencas")
-            .upsert([
-              {
-                chamada_id: chamada.id,
-                aluno_id: alunoId,
-                status: novoStatus,
-                atualizado_por: usuarioAtual.id,
-                atualizado_em: new Date().toISOString()
-              }
-            ], {
+            .upsert([{
+              chamada_id: chamada.id,
+              aluno_id: alunoId,
+              status: novoStatus,
+              atualizado_por: usuarioAtual.id,
+              atualizado_em: new Date().toISOString()
+            }], {
               onConflict: "chamada_id,aluno_id"
             });
 
@@ -1238,29 +1205,23 @@ async function mudarSemana(delta) {
 
           const { error: erroHistorico } = await supabase
             .from("historico_alteracoes")
-            .insert([
-              {
-                chamada_id: chamada.id,
-                aluno_id: alunoId,
-                professor_id: usuarioAtual.id,
-                professor_nome: professorAtual.nome,
-                disciplina: professorAtual.disciplina,
-                acao: acao,
-                status_resultante: novoStatus
-              }
-            ]);
+            .insert([{
+              chamada_id: chamada.id,
+              aluno_id: alunoId,
+              professor_id: usuarioAtual.id,
+              professor_nome: professorAtual.nome,
+              disciplina: professorAtual.disciplina,
+              acao: acao,
+              status_resultante: novoStatus
+            }]);
 
           if (erroHistorico) {
             throw erroHistorico;
           }
-
-          //msgTela.innerText = "Registro salvo com sucesso.";
         } catch (erro) {
           console.error("Erro ao salvar status:", erro);
 
-          // Rollback visual
           presencasMap[alunoId] = statusAnterior;
-
           if (ultimaAnterior) {
             ultimaAlteracaoMap[alunoId] = ultimaAnterior;
           } else {
@@ -1272,44 +1233,24 @@ async function mudarSemana(delta) {
           } else {
             msgTela.innerText = "Erro ao salvar alteração: " + erro.message;
           }
-
         } finally {
           salvandoMap[alunoId] = false;
           await carregarPermissaoHorario();
-          renderizarAlunos();
+          renderizarMapa();
           atualizarResumo();
         }
       })();
     }
 
-    async function carregarTelaChamada() {
+    async function carregarTelaMapa() {
       msgTela.innerText = "";
       await carregarPermissaoHorario();
       await carregarPresencasEHistorico();
-      renderizarAlunos();
+      renderizarMapa();
       atualizarResumo();
     }
 
-    async function abrirModoMapa() {
-      if (!turmaAtual?.id) return;
-
-      const { data, error } = await supabase
-        .from("turma_mapa_config")
-        .select("turma_id")
-        .eq("turma_id", turmaAtual.id)
-        .maybeSingle();
-
-      if (error) {
-        console.error("Erro ao verificar mapa da sala:", error);
-        msgTela.innerText = "Erro ao verificar mapa da sala: " + error.message;
-        return;
-      }
-
-      if (!data) {
-        alert("Esta turma ainda não tem mapa da sala configurado.");
-        return;
-      }
-
+    btnModoLista.addEventListener("click", () => {
       const params = new URLSearchParams({
         id: turmaAtual.id,
         data: dataChamadaInput.value,
@@ -1317,15 +1258,11 @@ async function mudarSemana(delta) {
         aula: aulaChamadaSelect.value
       });
 
-      window.location.href = `mapa-sala.html?${params.toString()}`;
-    }
-
-    btnMapaSala.addEventListener("click", async () => {
-      await abrirModoMapa();
+      window.location.href = `chamada.html?${params.toString()}`;
     });
 
     btnAtualizar.addEventListener("click", async () => {
-      await carregarTelaChamada();
+      await carregarTelaMapa();
     });
 
     btnVoltar.addEventListener("click", () => {
@@ -1333,20 +1270,17 @@ async function mudarSemana(delta) {
     });
 
     btnSemanaAnterior.addEventListener("click", async () => {
-  await mudarSemana(-1);
-});
+      await mudarSemana(-1);
+    });
 
-btnSemanaProxima.addEventListener("click", async () => {
-  await mudarSemana(1);
-});
+    btnSemanaProxima.addEventListener("click", async () => {
+      await mudarSemana(1);
+    });
 
     async function iniciar() {
       dataChamadaInput.value = obterDataInicialSelecionada();
       montarBotoesDatas();
       ligarBotoesAulas();
-      aplicarParametrosDaUrl();
-      sincronizarBotoesComControles();
-
 
       const okSessao = await carregarSessao();
       if (!okSessao) return;
@@ -1357,10 +1291,31 @@ btnSemanaProxima.addEventListener("click", async () => {
       const okTurma = await carregarTurma();
       if (!okTurma) return;
 
+      aplicarParametrosDaUrl();
+      sincronizarBotoesComControles();
+
       const okAlunos = await carregarAlunosDaTurma();
       if (!okAlunos) return;
 
-      await carregarTelaChamada();
+      const okConfig = await carregarConfigMapaSala();
+      if (!okConfig) return;
+
+      if (!configMapaSala) {
+        alert("Esta turma ainda não tem mapa da sala configurado.");
+        const params = new URLSearchParams({
+          id: turmaAtual.id,
+          data: dataChamadaInput.value,
+          periodo: periodoChamadaSelect.value,
+          aula: aulaChamadaSelect.value
+        });
+        window.location.href = `chamada.html?${params.toString()}`;
+        return;
+      }
+
+      const okPosicoes = await carregarPosicoesMapaSala();
+      if (!okPosicoes) return;
+
+      await carregarTelaMapa();
     }
 
     iniciar();
