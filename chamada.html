@@ -213,6 +213,23 @@
       min-width: 250px;
     }
 
+    .aluno-foto {
+      width: 90px;
+      min-width: 90px;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+    }
+
+    .aluno-foto img {
+      width: 84px;
+      height: 84px;
+      object-fit: cover;
+      border-radius: 10px;
+      border: 1px solid #ccc;
+      background: #f5f5f5;
+    }
+
     .aluno-acoes {
       display: flex;
       gap: 8px;
@@ -722,7 +739,7 @@ async function mudarSemana(delta) {
     async function carregarAlunosDaTurma() {
       const { data, error } = await supabase
         .from("alunos")
-        .select("id, numero, nome, rm, transferido")
+        .select("id, numero, nome, rm, transferido, foto_url")
         .eq("turma_id", turmaAtual.id)
         .order("numero", { ascending: true });
 
@@ -1124,6 +1141,15 @@ async function mudarSemana(delta) {
               <div style="margin-top:8px;">
                 ${transferido ? "" : ultimaLinha}
               </div>
+            </div>
+
+            <div class="aluno-foto">
+              ${
+                aluno.foto_url
+                  ? `<img src="${aluno.foto_url}" alt="Foto de ${aluno.nome}">`
+                  : `<div style="width:84px; height:84px; border:1px solid #ddd; border-radius:10px; background:#f5f5f5;"></div>`
+              }
+
             </div>
           </div>
         `;
