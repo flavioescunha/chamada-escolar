@@ -181,6 +181,28 @@
   </div>
 
   <div class="card">
+  <h3>Fotos dos alunos</h3>
+
+  <div class="muted">
+    Selecione as fotos dos alunos.  
+    Cada arquivo deve estar nomeado com o nome completo do aluno.
+  </div>
+
+  <input
+    type="file"
+    id="inputFotosAlunos"
+    accept="image/*"
+    multiple
+  />
+
+  <button id="btnEnviarFotosAlunos" class="btn-secundario">
+    Enviar fotos
+  </button>
+
+  <div id="msgFotosAlunos" class="mensagem"></div>
+</div>
+
+  <div class="card">
     <h3>Slots vinculados</h3>
     <div class="muted">
       Aqui o administrador pode liberar um slot semanal que foi vinculado por engano.
@@ -228,6 +250,10 @@
 
     const listaSlots = document.getElementById("listaSlots");
 
+    const inputFotosAlunos = document.getElementById("inputFotosAlunos");
+    const btnEnviarFotosAlunos = document.getElementById("btnEnviarFotosAlunos");
+    const msgFotosAlunos = document.getElementById("msgFotosAlunos");
+
     let usuarioAtual = null;
     let professorAtual = null;
     let mapaTurmas = {};
@@ -255,6 +281,83 @@
         "Sábado"
       ];
       return nomes[numero] ?? "Dia desconhecido";
+    }
+
+    function normalizarNomeFoto(txt) {
+      return String(txt || "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/\.[^.]+$/, "") // remove extensão
+        .replace(/\s+/g, " ")
+        .trim()
+        .toUpperCase();
+    }
+
+    async function enviarFotosAlunos() {
+      msgFotosAlunos.innerText = "";
+
+      const arquivos = Array.from(inputFotosAlunos.files || []);
+      if (arquivos.length === 0) {
+        msgFotosAlunos.innerText = "Selecione ao menos uma foto.";
+        return;
+      }
+
+      msgFotosAlunos.innerText = "Carregando alunos...";
+
+      const { data: alunos, error } = await supabase
+        .from("alunos")
+        .select("id, nome");
+
+      if (error) {
+        msgFotosAlunos.innerText = "Erro ao carregar alunos.";
+        return;
+      }
+
+      const mapa = {};
+      alunos.forEach(a => {
+        const chave = normalizarNomeFoto(a.nome);
+        mapa[chave] = mapa[chave] || [];
+        mapa[chave].push(a);
+      });
+
+      let enviados = 0;
+      let ignorados = 0;
+
+      for (const arquivo of arquivos) {
+        const chave = normalizarNomeFoto(arquivo.name);
+        const candidatos = mapa[chave] || [];
+
+        if (candidatos.length !== 1) {
+          ignorados++;
+          continue;
+        }
+
+        const aluno = candidatos[0];
+        const ext = arquivo.name.split(".").pop().toLowerCase();
+        const caminho = `${aluno.id}.${ext}`;
+
+        const { error: erroUpload } = await supabase
+          .storage
+          .from("fotos-alunos")
+          .upload(caminho, arquivo, { upsert: true });
+
+        if (erroUpload) continue;
+
+        const { data: pub } = supabase
+          .storage
+          .from("fotos-alunos")
+          .getPublicUrl(caminho);
+
+        await supabase
+          .from("alunos")
+          .update({ foto_url: pub.publicUrl })
+          .eq("id", aluno.id);
+
+        enviados++;
+      }
+
+      msgFotosAlunos.innerText =
+        `Concluído. Fotos enviadas: ${enviados}. Ignoradas: ${ignorados}.`;
     }
 
     async function carregarSessaoEAdmin() {
@@ -908,6 +1011,10 @@
       }
 
       window.location.href = "index.html";
+    });
+
+    btnEnviarFotosAlunos.addEventListener("click", async () => {
+      await enviarFotosAlunos();
     });
 
     btnCarregarChamadas.addEventListener("click", async () => {
