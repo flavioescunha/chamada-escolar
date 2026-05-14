@@ -214,21 +214,22 @@
     }
 
     .aluno-foto {
-      width: 135px;
-      min-width: 135px;
+      width: 90px;
+      min-width: 90px;
       display: flex;
       justify-content: center;
       align-items: flex-start;
     }
 
     .aluno-foto img {
-      width: 126px;
-      height: 126px;
+      width: 84px;
+      height: 84px;
       object-fit: cover;
       border-radius: 10px;
       border: 1px solid #ccc;
       background: #f5f5f5;
     }
+
 
     .aluno-acoes {
       display: flex;
@@ -259,6 +260,29 @@
     .sem-alunos {
       color: #666;
       padding: 10px 0;
+    }
+
+    .foto-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.72);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      padding: 20px;
+    }
+
+    .foto-overlay.aberto {
+      display: flex;
+    }
+
+    .foto-overlay img {
+      max-width: min(90vw, 700px);
+      max-height: 85vh;
+      border-radius: 14px;
+      border: 2px solid #fff;
+      background: #fff;
     }
 
     @media (max-width: 900px) {
@@ -382,6 +406,11 @@
     </div>
   </div>
 
+  <div id="fotoOverlay" class="foto-overlay">
+    <img id="fotoOverlayImg" src="" alt="Foto ampliada">
+  </div>
+
+
   <script type="module">
     import { supabase } from "./js/supabase.js";
 
@@ -414,6 +443,9 @@
     const msgTela = document.getElementById("msgTela");
     const listaAlunos = document.getElementById("listaAlunos");
 
+    const fotoOverlay = document.getElementById("fotoOverlay");
+    const fotoOverlayImg = document.getElementById("fotoOverlayImg");
+
     let usuarioAtual = null;
     let professorAtual = null;
     let turmaAtual = null;
@@ -426,6 +458,59 @@
 
     let propriedadeHorarioAtual = null;
     let podeEditar = true;
+
+    function configurarLongPress(card, fotoUrl, nomeAluno) {
+      if (!fotoUrl) return;
+
+      let pressionando = false;
+      let timer = null;
+      let longPressDisparado = false;
+
+      const iniciar = () => {
+        pressionando = true;
+        longPressDisparado = false;
+
+        timer = setTimeout(() => {
+          if (pressionando) {
+            longPressDisparado = true;
+            abrirFotoAmpliada(fotoUrl, nomeAluno);
+          }
+        }, 700);
+      };
+
+      const cancelar = () => {
+        pressionando = false;
+        if (timer) {
+          clearTimeout(timer);
+          timer = null;
+        }
+      };
+
+      card.addEventListener("mousedown", iniciar);
+      card.addEventListener("touchstart", iniciar, { passive: true });
+
+      card.addEventListener("mouseup", cancelar);
+      card.addEventListener("mouseleave", cancelar);
+      card.addEventListener("touchend", cancelar);
+      card.addEventListener("touchcancel", cancelar);
+
+      return () => longPressDisparado;
+    }
+
+
+    function abrirFotoAmpliada(url, nome) {
+      if (!url) return;
+      fotoOverlayImg.src = url;
+      fotoOverlayImg.alt = `Foto ampliada de ${nome}`;
+      fotoOverlay.classList.add("aberto");
+    }
+
+    function fecharFotoAmpliada() {
+      fotoOverlay.classList.remove("aberto");
+      fotoOverlayImg.src = "";
+    }
+
+    fotoOverlay.addEventListener("click", fecharFotoAmpliada);
 
     function getTurmaIdDaUrl() {
       const params = new URLSearchParams(window.location.search);
@@ -1110,10 +1195,37 @@ async function mudarSemana(delta) {
         div.dataset.alunoId = aluno.id;
         div.dataset.statusAtual = status;
 
+        let ultimaLinha = `<div class="muted">Nenhuma alteração registrada ainda.</div>`;
+
+        if (salvando) {
+          ultimaLinha = `<div class="muted">Salvando alteração...</div>`;
+        } else if (ultima) {
+          const acaoLegivel = ultima.acao === "marcou_falta" ? "marcou falta" : "retirou falta";
+          ultimaLinha = `
+            <div class="muted">
+              Última alteração: ${ultima.professor_nome || "Professor"} (${ultima.disciplina || "-"}) ${acaoLegivel}
+            </div>
+          `;
+        }
+
         div.innerHTML = `
           <div class="aluno-topo">
             <div class="aluno-info">
-              <strong>Nº ${aluno.numero} - ${aluno.nome}</strong>
+              <strong>Nº ${aluno.numero} - ${aluno.nome}</strong><br>
+              <span class="muted">RM: ${aluno.rm || "-"}</span><br>
+              <span class="badge-status">
+                Status atual: ${transferido ? "Transferido" : (status === "F" ? "Falta" : "Presente")}
+              </span><br>
+              <span class="muted">
+                ${
+                  transferido
+                    ? "Aluno transferido/inativo. Não participa da chamada."
+                    : (podeEditar ? "Clique no card para alternar presença/falta." : "Somente visualização.")
+                }
+              </span>
+              <div style="margin-top:8px;">
+                ${transferido ? "" : ultimaLinha}
+              </div>
             </div>
 
             <div class="aluno-foto">
@@ -1127,14 +1239,16 @@ async function mudarSemana(delta) {
         `;
 
 
-        listaAlunos.appendChild(div);
-      });
+        const longPressFoiDisparado = configurarLongPress(div, aluno.foto_url, aluno.nome);
 
-      document.querySelectorAll(".aluno-card").forEach((card) => {
-        card.addEventListener("click", () => {
-          const aluno = alunosDaTurma.find((a) => a.id === card.dataset.alunoId);
+        div.addEventListener("click", () => {
+          if (typeof longPressFoiDisparado === "function" && longPressFoiDisparado()) {
+            return;
+          }
 
-          if (aluno?.transferido === true) {
+          const alunoCard = alunosDaTurma.find((a) => a.id === div.dataset.alunoId);
+
+          if (alunoCard?.transferido === true) {
             msgTela.innerText = "Este aluno está marcado como transferido/inativo e não participa da chamada.";
             return;
           }
@@ -1144,18 +1258,20 @@ async function mudarSemana(delta) {
             return;
           }
 
-          const alunoId = card.dataset.alunoId;
+          const alunoId = div.dataset.alunoId;
 
           if (salvandoMap[alunoId]) {
             return;
           }
 
-          const statusAtual = card.dataset.statusAtual || "C";
+          const statusAtual = div.dataset.statusAtual || "C";
           const novoStatus = statusAtual === "F" ? "C" : "F";
 
           registrarStatus(alunoId, novoStatus);
         });
-      });
+
+        listaAlunos.appendChild(div);
+        });
     }
 
     function registrarStatus(alunoId, novoStatus) {

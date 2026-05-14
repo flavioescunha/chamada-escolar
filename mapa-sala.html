@@ -242,6 +242,29 @@
       background: #f7f7f7;
     }
 
+    .foto-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.72);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      padding: 20px;
+    }
+
+    .foto-overlay.aberto {
+      display: flex;
+    }
+
+    .foto-overlay img {
+      max-width: min(90vw, 700px);
+      max-height: 85vh;
+      border-radius: 14px;
+      border: 2px solid #fff;
+      background: #fff;
+    }
+
     @media (max-width: 900px) {
       .linha-filtros {
         grid-template-columns: 1fr;
@@ -348,6 +371,10 @@
     <div id="mapaSala" class="mapa-grade"></div>
   </div>
 
+  <div id="fotoOverlay" class="foto-overlay">
+    <img id="fotoOverlayImg" src="" alt="Foto ampliada">
+  </div>
+
   <script type="module">
     import { supabase } from "./js/supabase.js";
 
@@ -377,6 +404,9 @@
     const msgTela = document.getElementById("msgTela");
     const mapaSala = document.getElementById("mapaSala");
 
+    const fotoOverlay = document.getElementById("fotoOverlay");
+    const fotoOverlayImg = document.getElementById("fotoOverlayImg");
+
     let usuarioAtual = null;
     let professorAtual = null;
     let turmaAtual = null;
@@ -393,6 +423,59 @@
     let podeEditar = true;
 
     let deslocamentoSemana = 0;
+
+    function configurarLongPress(card, fotoUrl, nomeAluno) {
+      if (!fotoUrl) return;
+
+      let pressionando = false;
+      let timer = null;
+      let longPressDisparado = false;
+
+      const iniciar = () => {
+        pressionando = true;
+        longPressDisparado = false;
+
+        timer = setTimeout(() => {
+          if (pressionando) {
+            longPressDisparado = true;
+            abrirFotoAmpliada(fotoUrl, nomeAluno);
+          }
+        }, 700);
+      };
+
+      const cancelar = () => {
+        pressionando = false;
+        if (timer) {
+          clearTimeout(timer);
+          timer = null;
+        }
+      };
+
+      card.addEventListener("mousedown", iniciar);
+      card.addEventListener("touchstart", iniciar, { passive: true });
+
+      card.addEventListener("mouseup", cancelar);
+      card.addEventListener("mouseleave", cancelar);
+      card.addEventListener("touchend", cancelar);
+      card.addEventListener("touchcancel", cancelar);
+
+      return () => longPressDisparado;
+    }
+
+
+    function abrirFotoAmpliada(url, nome) {
+      if (!url) return;
+      fotoOverlayImg.src = url;
+      fotoOverlayImg.alt = `Foto ampliada de ${nome}`;
+      fotoOverlay.classList.add("aberto");
+    }
+
+    function fecharFotoAmpliada() {
+      fotoOverlay.classList.remove("aberto");
+      fotoOverlayImg.src = "";
+    }
+
+    fotoOverlay.addEventListener("click", fecharFotoAmpliada);
 
     function getTurmaIdDaUrl() {
       const params = new URLSearchParams(window.location.search);
@@ -1109,7 +1192,13 @@
         </div>
       `;
 
+      const longPressFoiDisparado = configurarLongPress(div, aluno.foto_url, aluno.nome);
+
+
       div.addEventListener("click", () => {
+        if (typeof longPressFoiDisparado === "function" && longPressFoiDisparado()) {
+          return;
+        }
         if (transferido) {
           msgTela.innerText = "Este aluno está marcado como transferido/inativo e não participa da chamada.";
           return;
