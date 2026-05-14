@@ -214,16 +214,16 @@
     }
 
     .aluno-foto {
-      width: 90px;
-      min-width: 90px;
+      width: 135px;
+      min-width: 135px;
       display: flex;
       justify-content: center;
       align-items: flex-start;
     }
 
     .aluno-foto img {
-      width: 84px;
-      height: 84px;
+      width: 126px;
+      height: 126px;
       object-fit: cover;
       border-radius: 10px;
       border: 1px solid #ccc;
@@ -1110,46 +1110,18 @@ async function mudarSemana(delta) {
         div.dataset.alunoId = aluno.id;
         div.dataset.statusAtual = status;
 
-        let ultimaLinha = `<div class="muted">Nenhuma alteração registrada ainda.</div>`;
-
-        if (salvando) {
-          ultimaLinha = `<div class="muted">Salvando alteração...</div>`;
-        } else if (ultima) {
-          const acaoLegivel = ultima.acao === "marcou_falta" ? "marcou falta" : "retirou falta";
-          ultimaLinha = `
-            <div class="muted">
-              Última alteração: ${ultima.professor_nome || "Professor"} (${ultima.disciplina || "-"}) ${acaoLegivel}
-            </div>
-          `;
-        }
-
         div.innerHTML = `
           <div class="aluno-topo">
             <div class="aluno-info">
-              <strong>Nº ${aluno.numero} - ${aluno.nome}</strong><br>
-              <span class="muted">RM: ${aluno.rm || "-"}</span><br>
-              <span class="badge-status">
-                Status atual: ${transferido ? "Transferido" : (status === "F" ? "Falta" : "Presente")}
-              </span><br>
-              <span class="muted">
-                ${
-                  transferido
-                    ? "Aluno transferido/inativo. Não participa da chamada."
-                    : (podeEditar ? "Clique no card para alternar presença/falta." : "Somente visualização.")
-                }
-              </span>
-              <div style="margin-top:8px;">
-                ${transferido ? "" : ultimaLinha}
-              </div>
+              <strong>Nº ${aluno.numero} - ${aluno.nome}</strong>
             </div>
 
             <div class="aluno-foto">
               ${
                 aluno.foto_url
                   ? `<img src="${aluno.foto_url}" alt="Foto de ${aluno.nome}">`
-                  : `<div style="width:84px; height:84px; border:1px solid #ddd; border-radius:10px; background:#f5f5f5;"></div>`
+                  : ``
               }
-
             </div>
           </div>
         `;
