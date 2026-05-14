@@ -178,6 +178,35 @@
       box-sizing: border-box;
     }
 
+    .card-mapa-topo {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 10px;
+    }
+
+    .card-mapa-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .card-mapa-foto {
+      width: 90px;
+      min-width: 90px;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+    }
+
+    .card-mapa-foto img {
+      width: 84px;
+      height: 84px;
+      object-fit: cover;
+      border-radius: 10px;
+      border: 1px solid #ccc;
+      background: #f5f5f5;
+    }
+
     .card-mapa-aluno.falta {
       background: #ffe5e5;
       border-color: #e3a1a1;
@@ -648,9 +677,10 @@
     async function carregarAlunosDaTurma() {
       const { data, error } = await supabase
         .from("alunos")
-        .select("id, numero, nome, rm, transferido")
+        .select("id, numero, nome, rm, transferido, foto_url")
         .eq("turma_id", turmaAtual.id)
         .order("numero", { ascending: true });
+
 
       if (error) {
         console.error(error);
@@ -1050,20 +1080,32 @@
       }
 
       div.innerHTML = `
-        <strong>Nº ${aluno.numero} - ${aluno.nome}</strong><br>
-        <span class="muted">RM: ${aluno.rm || "-"}</span><br>
-        <span class="badge-status">
-          Status atual: ${transferido ? "Transferido" : (status === "F" ? "Falta" : "Presente")}
-        </span><br>
-        <span class="muted">
-          ${
-            transferido
-              ? "Aluno transferido/inativo. Não participa da chamada."
-              : (podeEditar ? "Clique no card para alternar presença/falta." : "Somente visualização.")
-          }
-        </span>
-        <div style="margin-top:8px;">
-          ${transferido ? "" : ultimaLinha}
+        <div class="card-mapa-topo">
+          <div class="card-mapa-info">
+            <strong>Nº ${aluno.numero} - ${aluno.nome}</strong><br>
+            <span class="muted">RM: ${aluno.rm || "-"}</span><br>
+            <span class="badge-status">
+              Status atual: ${transferido ? "Transferido" : (status === "F" ? "Falta" : "Presente")}
+            </span><br>
+            <span class="muted">
+              ${
+                transferido
+                  ? "Aluno transferido/inativo. Não participa da chamada."
+                  : (podeEditar ? "Clique no card para alternar presença/falta." : "Somente visualização.")
+              }
+            </span>
+            <div style="margin-top:8px;">
+              ${transferido ? "" : ultimaLinha}
+            </div>
+          </div>
+
+          <div class="card-mapa-foto">
+            ${
+              aluno.foto_url
+                ? `${aluno.foto_url}`
+                : ``
+            }
+          </div>
         </div>
       `;
 
