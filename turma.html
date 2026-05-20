@@ -468,7 +468,8 @@
             <div class="aluno-item-foto">
               ${
                 aluno.foto_url
-                  ? `<img src="${aluno.foto_url}" alt="Foto de ${aluno.nome}</div>`
+                  ? `<img src="${aluno.foto_url}" alt="Foto de ${aluno.nome}">`
+                  : `<div class="muted">Sem foto</div>`
               }
             </div>
           </div>
