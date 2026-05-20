@@ -55,52 +55,6 @@
       background: #fff;
     }
 
-    .aluno-item-topo {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      gap: 12px;
-      flex-wrap: wrap;
-    }
-
-    .aluno-item-info {
-      flex: 1;
-      min-width: 220px;
-    }
-
-    .aluno-item-foto {
-      width: 90px;
-      min-width: 90px;
-      display: flex;
-      justify-content: center;
-      align-items: flex-start;
-    }
-
-    .aluno-item-foto img {
-      width: 84px;
-      height: 84px;
-      object-fit: cover;
-      border-radius: 10px;
-      border: 1px solid #ccc;
-      background: #f5f5f5;
-    }
-
-    .aluno-item-acoes {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-      margin-top: 10px;
-    }
-
-    .aluno-item-acoes button {
-      width: auto;
-      margin: 0;
-    }
-
-    .input-foto-aluno {
-      display: none;
-    }
-
     .aluno-item.transferido {
       background: #eeeeee;
       border-color: #c8c8c8;
@@ -435,7 +389,7 @@
 
       const { data, error } = await supabase
         .from("alunos")
-        .select("id, numero, nome, rm, transferido, foto_url")
+        .select("id, numero, nome, rm, transferido")
         .eq("turma_id", turmaAtual.id)
         .order("numero", { ascending: true });
 
@@ -458,180 +412,12 @@
         const div = document.createElement("div");
         div.className = `aluno-item ${aluno.transferido ? "transferido" : ""}`;
         div.innerHTML = `
-          <div class="aluno-item-topo">
-            <div class="aluno-item-info">
-              <strong>Nº ${aluno.numero} - ${aluno.nome}</strong><br>
-              <span class="muted">RM: ${aluno.rm || "-"}</span><br>
-              ${aluno.transferido ? `<span class="muted">Aluno transferido/inativo</span>` : ""}
-            </div>
-
-            <div class="aluno-item-foto">
-              ${
-                aluno.foto_url
-                  ? `<img src="${aluno.foto_url}" alt="Foto de ${aluno.nome}</div>`
-              }
-            </div>
-          </div>
-
-          <div class="aluno-item-acoes">
-            <input
-              type="file"
-              class="input-foto-aluno"
-              data-id="${aluno.id}"
-              data-nome="${aluno.nome}"
-              accept="image/*"
-            >
-            <button class="btn-secundario btnCarregarFotoAluno" data-id="${aluno.id}">
-              ${aluno.foto_url ? "Substituir foto" : "Carregar foto"}
-            </button>
-            ${
-              aluno.foto_url
-                ? `<button class="btn-secundario btnExcluirFotoAluno" data-id="${aluno.id}" data-nome="${aluno.nome}">Excluir foto</button>`
-                : ``
-            }
-          </div>
+          <strong>Nº ${aluno.numero} - ${aluno.nome}</strong><br>
+          <span class="muted">RM: ${aluno.rm || "-"}</span><br>
+          ${aluno.transferido ? `<span class="muted">Aluno transferido/inativo</span>` : ""}
         `;
         listaAlunos.appendChild(div);
       });
-
-      document.querySelectorAll(".btnCarregarFotoAluno").forEach((btn) => {
-        btn.addEventListener("click", () => {
-          const alunoId = btn.dataset.id;
-          const input = listaAlunos.querySelector(`.input-foto-aluno[data-id="${alunoId}"]`);
-          if (input) {
-            input.click();
-          }
-        });
-      });
-
-      document.querySelectorAll(".input-foto-aluno").forEach((input) => {
-        input.addEventListener("change", async () => {
-          const arquivo = input.files?.[0];
-          const alunoId = input.dataset.id;
-          const nomeAluno = input.dataset.nome || "Aluno";
-
-          if (!arquivo || !alunoId) return;
-
-          await uploadFotoAluno(alunoId, nomeAluno, arquivo);
-
-          input.value = "";
-        });
-      });
-
-      document.querySelectorAll(".btnExcluirFotoAluno").forEach((btn) => {
-        btn.addEventListener("click", async () => {
-          const alunoId = btn.dataset.id;
-          const nomeAluno = btn.dataset.nome || "Aluno";
-          await excluirFotoAluno(alunoId, nomeAluno);
-        });
-      });
-    }
-
-    function extrairCaminhoStorageDaUrl(url) {
-      if (!url) return null;
-
-      const marcador = "/storage/v1/object/public/fotos-alunos/";
-      const idx = url.indexOf(marcador);
-
-      if (idx === -1) return null;
-
-      return decodeURIComponent(url.substring(idx + marcador.length));
-    }
-
-    async function uploadFotoAluno(alunoId, nomeAluno, arquivo) {
-      if (!arquivo) return;
-
-      if (!arquivo.type.startsWith("image/")) {
-        alert("Selecione um arquivo de imagem válido.");
-        return;
-      }
-
-      const aluno = alunosTurmaAtual.find((a) => a.id === alunoId);
-      if (!aluno) {
-        alert("Aluno não encontrado.");
-        return;
-      }
-
-      const extensao = (arquivo.name.split(".").pop() || "jpg").toLowerCase();
-      const caminhoNovo = `alunos/${alunoId}-${Date.now()}.${extensao}`;
-
-      // Se já houver foto anterior, tenta apagar
-      if (aluno.foto_url) {
-        const caminhoAntigo = extrairCaminhoStorageDaUrl(aluno.foto_url);
-        if (caminhoAntigo) {
-          await supabase.storage.from("fotos-alunos").remove([caminhoAntigo]);
-        }
-      }
-
-      const { error: erroUpload } = await supabase
-        .storage
-        .from("fotos-alunos")
-        .upload(caminhoNovo, arquivo, { upsert: false });
-
-      if (erroUpload) {
-        console.error("Erro no upload da foto:", erroUpload);
-        alert("Erro ao enviar foto: " + erroUpload.message);
-        return;
-      }
-
-      const { data: pub } = supabase
-        .storage
-        .from("fotos-alunos")
-        .getPublicUrl(caminhoNovo);
-
-      const fotoUrl = pub?.publicUrl || null;
-
-      const { error: erroUpdate } = await supabase
-        .from("alunos")
-        .update({ foto_url: fotoUrl })
-        .eq("id", alunoId);
-
-      if (erroUpdate) {
-        console.error("Erro ao salvar foto_url:", erroUpdate);
-        alert("Foto enviada, mas deu erro ao gravar no aluno: " + erroUpdate.message);
-        return;
-      }
-
-      await carregarAlunos();
-      await carregarPosicoesMapaSala();
-      renderizarMapaSalaConfig();
-    }
-
-    async function excluirFotoAluno(alunoId, nomeAluno) {
-      const aluno = alunosTurmaAtual.find((a) => a.id === alunoId);
-      if (!aluno || !aluno.foto_url) return;
-
-      const confirmar = confirm(`Deseja excluir a foto de "${nomeAluno}"?`);
-      if (!confirmar) return;
-
-      const caminho = extrairCaminhoStorageDaUrl(aluno.foto_url);
-      if (caminho) {
-        const { error: erroRemove } = await supabase
-          .storage
-          .from("fotos-alunos")
-          .remove([caminho]);
-
-        if (erroRemove) {
-          console.error("Erro ao remover arquivo da foto:", erroRemove);
-          alert("Erro ao remover arquivo da foto: " + erroRemove.message);
-          return;
-        }
-      }
-
-      const { error: erroUpdate } = await supabase
-        .from("alunos")
-        .update({ foto_url: null })
-        .eq("id", alunoId);
-
-      if (erroUpdate) {
-        console.error("Erro ao limpar foto_url do aluno:", erroUpdate);
-        alert("Erro ao limpar a foto do aluno: " + erroUpdate.message);
-        return;
-      }
-
-      await carregarAlunos();
-      await carregarPosicoesMapaSala();
-      renderizarMapaSalaConfig();
     }
 
     async function carregarConfigMapaSala() {
@@ -680,11 +466,13 @@
         return;
       }
 
+      
       msgMapa.innerText = "Configuração do mapa salva com sucesso.";
       await carregarConfigMapaSala();
       await carregarPosicoesMapaSala();
       await preencherMapaSalaAutomaticamente();
       renderizarMapaSalaConfig();
+
     }
 
     async function carregarPosicoesMapaSala() {
@@ -800,6 +588,7 @@
       msgMapa.innerText = "Mapa reiniciado com sucesso.";
     }
 
+    
     function obterPosicaoAluno(alunoId) {
       return posicoesMapaSala.find((p) => p.aluno_id === alunoId) || null;
     }
@@ -861,9 +650,11 @@
       });
     }
 
+    
     function renderizarMapaSalaConfig() {
       limparDestaquesMapa();
       gradeMapaSala.innerHTML = "";
+
 
       if (!configMapaSala) {
         gradeMapaSala.innerHTML = `<div class="muted">Salve primeiro a configuração de fileiras e carteiras.</div>`;
@@ -1120,6 +911,7 @@
             rm: rm || null,
             transferido: false
           }
+
         ]);
 
       if (error) {
