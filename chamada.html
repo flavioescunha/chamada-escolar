@@ -92,6 +92,15 @@
       flex-wrap: nowrap;
     }
 
+    .lista-frame {
+      touch-action: pan-y;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .aluno-card {
+      touch-action: pan-y;
+    }
+
     .aluno-card,
     .aluno-foto,
     .aluno-foto img,
@@ -476,14 +485,22 @@
       let pressionando = false;
       let timer = null;
       let longPressDisparado = false;
+      let touchInicialX = null;
+      let touchInicialY = null;
+
+      const DISTANCIA_CANCELAMENTO = 12;
 
       const iniciar = (e) => {
-        if (e.type === "touchstart") {
-          e.preventDefault();
-        }
-
         pressionando = true;
         longPressDisparado = false;
+
+        if (e.type === "touchstart" && e.touches && e.touches.length > 0) {
+          touchInicialX = e.touches[0].clientX;
+          touchInicialY = e.touches[0].clientY;
+        } else {
+          touchInicialX = null;
+          touchInicialY = null;
+        }
 
         timer = setTimeout(() => {
           if (pressionando) {
@@ -495,23 +512,38 @@
 
       const cancelar = () => {
         pressionando = false;
+        touchInicialX = null;
+        touchInicialY = null;
+
         if (timer) {
           clearTimeout(timer);
           timer = null;
         }
       };
 
+      const aoMoverTouch = (e) => {
+        if (!pressionando || touchInicialX === null || touchInicialY === null) return;
+        if (!e.touches || e.touches.length === 0) return;
+
+        const x = e.touches[0].clientX;
+        const y = e.touches[0].clientY;
+
+        const dx = Math.abs(x - touchInicialX);
+        const dy = Math.abs(y - touchInicialY);
+
+        if (dx > DISTANCIA_CANCELAMENTO || dy > DISTANCIA_CANCELAMENTO) {
+          cancelar();
+        }
+      };
+
       card.addEventListener("mousedown", iniciar);
-      card.addEventListener("touchstart", iniciar, { passive: false });
+      card.addEventListener("touchstart", iniciar, { passive: true });
 
       card.addEventListener("mouseup", cancelar);
       card.addEventListener("mouseleave", cancelar);
       card.addEventListener("touchend", cancelar);
       card.addEventListener("touchcancel", cancelar);
-
-      card.addEventListener("contextmenu", (e) => {
-        e.preventDefault();
-      });
+      card.addEventListener("touchmove", aoMoverTouch, { passive: true });
 
       return () => longPressDisparado;
     }
