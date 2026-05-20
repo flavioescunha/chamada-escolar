@@ -92,6 +92,17 @@
       flex-wrap: nowrap;
     }
 
+    .aluno-card,
+    .aluno-foto,
+    .aluno-foto img,
+    .foto-overlay,
+    .foto-overlay img {
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+
+
 .btn-semana {
   min-width: 40px !important;
   width: 40px;
@@ -466,7 +477,11 @@
       let timer = null;
       let longPressDisparado = false;
 
-      const iniciar = () => {
+      const iniciar = (e) => {
+        if (e.type === "touchstart") {
+          e.preventDefault();
+        }
+
         pressionando = true;
         longPressDisparado = false;
 
@@ -487,16 +502,19 @@
       };
 
       card.addEventListener("mousedown", iniciar);
-      card.addEventListener("touchstart", iniciar, { passive: true });
+      card.addEventListener("touchstart", iniciar, { passive: false });
 
       card.addEventListener("mouseup", cancelar);
       card.addEventListener("mouseleave", cancelar);
       card.addEventListener("touchend", cancelar);
       card.addEventListener("touchcancel", cancelar);
 
+      card.addEventListener("contextmenu", (e) => {
+        e.preventDefault();
+      });
+
       return () => longPressDisparado;
     }
-
 
     function abrirFotoAmpliada(url, nome) {
       if (!url) return;
@@ -511,6 +529,14 @@
     }
 
     fotoOverlay.addEventListener("click", fecharFotoAmpliada);
+
+    fotoOverlay.addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+    });
+
+    fotoOverlayImg.addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+    });
 
     function getTurmaIdDaUrl() {
       const params = new URLSearchParams(window.location.search);
