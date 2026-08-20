@@ -423,6 +423,11 @@
     </div>
     <div class="lista-frame">
       <div id="listaAlunos">Carregando...</div>
+      <div id="containerCompartilhar" style="display: none; margin-top: 20px; margin-bottom: 20px; text-align: center;">
+        <button id="btnCompartilharFaltas" class="btn-secundario" style="width: auto; padding: 10px 20px; font-weight: bold;">
+          <span style="margin-right: 8px;">📤</span> Compartilhar Faltantes
+        </button>
+      </div>
     </div>
   </div>
 
@@ -442,8 +447,10 @@
     
     const btnMapaSala = document.getElementById("btnMapaSala");
     const btnAtualizar = document.getElementById("btnAtualizar");
-    const btnVoltar = document.getElementById("btnVoltar")
-
+    const btnVoltar = document.getElementById("btnVoltar");
+    
+    const containerCompartilhar = document.getElementById("containerCompartilhar");
+    const btnCompartilharFaltas = document.getElementById("btnCompartilharFaltas");
 
     const dataChamadaInput = document.getElementById("dataChamada");
     const periodoChamadaSelect = document.getElementById("periodoChamada");
@@ -638,6 +645,13 @@ function definirPeriodoInicialPeloHorario() {
     periodoChamadaSelect.value = "Manhã";
   }
 }
+
+    function formatarIsoParaBR(iso) {
+      if (!iso) return "";
+      const partes = iso.split("-");
+      if (partes.length !== 3) return iso;
+      return `${partes[2]}/${partes[1]}/${partes[0]}`;
+    }
 
     function parseDataLocal(iso) {
       if (!iso) return null;
@@ -1329,7 +1343,13 @@ async function mudarSemana(delta) {
         });
 
         listaAlunos.appendChild(div);
-        });
+      });
+      
+      if (alunosDaTurma && alunosDaTurma.length > 0) {
+        containerCompartilhar.style.display = "block";
+      } else {
+        containerCompartilhar.style.display = "none";
+      }
     }
 
     function registrarStatus(alunoId, novoStatus) {
@@ -1503,6 +1523,45 @@ async function mudarSemana(delta) {
     btnVoltar.addEventListener("click", () => {
       window.location.href = "turmas.html";
     });
+
+    if (btnCompartilharFaltas) {
+      btnCompartilharFaltas.addEventListener("click", () => {
+        if (!turmaAtual || !alunosDaTurma) return;
+
+        const nomeTurma = turmaAtual.nome;
+        const dataStr = formatarIsoParaBR(dataChamadaInput.value);
+        const aula = parseInt(aulaChamadaSelect.value, 10);
+        
+        const faltantes = alunosDaTurma.filter(aluno => presencasMap[aluno.id] === 'F' && !aluno.transferido);
+
+        let texto = `Faltantes de ${nomeTurma}, dia ${dataStr}, aula ${aula}:\n`;
+
+        if (faltantes.length > 0) {
+          const lista = faltantes.map(a => `${a.numero}, ${a.nome}`).join('\n');
+          texto += lista;
+        } else {
+          texto += "Nenhum aluno faltou nesta aula.";
+        }
+
+        navigator.clipboard.writeText(texto).then(() => {
+          const textoOriginal = btnCompartilharFaltas.innerHTML;
+          btnCompartilharFaltas.innerHTML = `<span style="margin-right: 8px;">✅</span> Copiado!`;
+          btnCompartilharFaltas.style.backgroundColor = "#d4edda";
+          btnCompartilharFaltas.style.borderColor = "#c3e6cb";
+          btnCompartilharFaltas.style.color = "#155724";
+
+          setTimeout(() => {
+            btnCompartilharFaltas.innerHTML = textoOriginal;
+            btnCompartilharFaltas.style.backgroundColor = "";
+            btnCompartilharFaltas.style.borderColor = "";
+            btnCompartilharFaltas.style.color = "";
+          }, 2000);
+        }).catch(err => {
+          console.error('Erro ao copiar para a área de transferência: ', err);
+          alert('Não foi possível copiar o texto automaticamente.');
+        });
+      });
+    }
 
     btnSemanaAnterior.addEventListener("click", async () => {
   await mudarSemana(-1);

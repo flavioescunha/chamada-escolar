@@ -5,6 +5,7 @@ type Entrada = {
   senha: string;
   turma?: string;
   data?: string; // dd/mm
+  data_iso?: string; // yyyy-mm-dd
   aulas?: number[];
   comando?: string; // ex.: "-faltas-hoje"
 };
@@ -222,22 +223,31 @@ Deno.serve(async (req) => {
     }
 
     // =========================================================
-    // MODO NOVO: TODAS AS FALTAS DE HOJE EM TODAS AS TURMAS
+    // MODO NOVO: TODAS AS FALTAS DE HOJE OU DE UMA DATA ESPECÍFICA EM TODAS AS TURMAS
     // =========================================================
-    if (comando === "-faltas-hoje" || comando === "faltas-hoje") {
-      const dataIsoHoje = hojeIsoBrasil();
+    if (comando === "-faltas-hoje" || comando === "faltas-hoje" || comando === "-faltas-data") {
+      let dataIsoAlvo = hojeIsoBrasil();
+      let modoStr = "faltas-hoje";
+
+      if (comando === "-faltas-data") {
+        const d = String(body.data_iso || "").trim();
+        if (!d || !/^\d{4}-\d{2}-\d{2}$/.test(d)) {
+          return erro("entrada_invalida", "Campo 'data_iso' inválido ou não informado. Use YYYY-MM-DD.");
+        }
+        dataIsoAlvo = d;
+        modoStr = "faltas-data";
+      }
 
       const { data: chamadasHoje, error: erroChamadasHoje } = await admin
         .from("chamadas")
         .select("id, turma_id, data_chamada, periodo, aula, criada_por")
-        .eq("criada_por", professor.id)
-        .eq("data_chamada", dataIsoHoje)
+        .eq("data_chamada", dataIsoAlvo)
         .order("turma_id", { ascending: true })
         .order("periodo", { ascending: true })
         .order("aula", { ascending: true });
 
       if (erroChamadasHoje) {
-        return erro("erro_consulta", "Erro ao carregar chamadas de hoje.", 500);
+        return erro("erro_consulta", "Erro ao carregar chamadas da data alvo.", 500);
       }
 
       const chamadasLista = chamadasHoje || [];
@@ -245,11 +255,103 @@ Deno.serve(async (req) => {
       if (chamadasLista.length === 0) {
         return respostaJson({
           ok: true,
-          modo: "faltas-hoje",
-          data: dataIsoHoje,
+          modo: modoStr,
+          data: dataIsoAlvo,
           resultado: [],
         });
       }
+
+      // --- FILTRO POR PROFESSOR + HERANÇA ---
+      // Separar chamadas do professor autenticado
+      const minhasChamadas = chamadasLista.filter(
+        (c) => c.criada_por === auth.userId,
+      );
+
+      // Turma IDs onde o professor já tem chamada própria hoje
+      const turmaIdsComChamadaPropria = new Set(
+        minhasChamadas.map((c) => c.turma_id),
+      );
+
+      // Turma IDs do dia onde o professor NÃO fez chamada
+      const turmaIdsSemChamadaPropria = [
+        ...new Set(
+          chamadasLista
+            .filter((c) => !turmaIdsComChamadaPropria.has(c.turma_id))
+            .map((c) => c.turma_id),
+        ),
+      ];
+
+      // Buscar histórico do professor para herança em turmas sem chamada própria
+      // deno-lint-ignore no-explicit-any
+      let chamadasVirtuais: any[] = [];
+
+      if (turmaIdsSemChamadaPropria.length > 0) {
+        const { data: historicoRaw } = await admin
+          .from("chamadas")
+          .select("turma_id, periodo, aula, data_chamada")
+          .eq("criada_por", auth.userId)
+          .in("turma_id", turmaIdsSemChamadaPropria)
+          .order("data_chamada", { ascending: false })
+          .limit(200);
+
+        const historico = historicoRaw || [];
+
+        if (historico.length > 0) {
+          // Dia da semana alvo para preferir o mesmo dia no histórico
+          const targetDow = new Date(dataIsoAlvo + "T12:00:00Z").getUTCDay();
+
+          for (const tid of turmaIdsSemChamadaPropria) {
+            const destaTurma = historico.filter((h) => h.turma_id === tid);
+            if (destaTurma.length === 0) continue;
+
+            // Só considerar chamadas do mesmo dia da semana
+            const mesmoDow = destaTurma.filter(
+              (h) =>
+                new Date(h.data_chamada + "T12:00:00Z").getUTCDay() ===
+                targetDow,
+            );
+            // Se não há histórico neste dia da semana, o professor não dá aula aqui neste dia
+            if (mesmoDow.length === 0) continue;
+            const fonte = mesmoDow;
+
+            // Usar as aulas da data mais recente encontrada
+            const dataRef = fonte[0].data_chamada;
+            const aulasNaData = fonte.filter(
+              (h) => h.data_chamada === dataRef,
+            );
+
+            // Deduplicar por aula
+            const aulasVistas = new Set<number>();
+            for (const h of aulasNaData) {
+              const aula = h.aula as number;
+              if (aulasVistas.has(aula)) continue;
+              aulasVistas.add(aula);
+
+              chamadasVirtuais.push({
+                id: `virtual_${h.turma_id}_${aula}`,
+                turma_id: h.turma_id,
+                data_chamada: dataIsoAlvo,
+                periodo: h.periodo,
+                aula: aula,
+                criada_por: auth.userId,
+              });
+            }
+          }
+        }
+      }
+
+      // Resultado final: chamadas próprias + virtuais (herança)
+      const chamadasParaResultado = [...minhasChamadas, ...chamadasVirtuais];
+
+      if (chamadasParaResultado.length === 0) {
+        return respostaJson({
+          ok: true,
+          modo: modoStr,
+          data: dataIsoAlvo,
+          resultado: [],
+        });
+      }
+      // --- FIM FILTRO POR PROFESSOR ---
 
       const turmaIds = Array.from(new Set(chamadasLista.map((c) => c.turma_id)));
 
@@ -320,7 +422,7 @@ Deno.serve(async (req) => {
 
       const resultadoHoje: ResultadoHoje[] = [];
 
-      for (const chamadaAlvo of chamadasLista) {
+      for (const chamadaAlvo of chamadasParaResultado) {
         const ultimoStatusPorAluno = new Map<
           string,
           { status: string; aula: number; atualizado_em: string }
@@ -385,8 +487,8 @@ Deno.serve(async (req) => {
 
       return respostaJson({
         ok: true,
-        modo: "faltas-hoje",
-        data: dataIsoHoje,
+        modo: modoStr,
+        data: dataIsoAlvo,
         resultado: resultadoHoje,
       });
     }
@@ -461,7 +563,6 @@ Deno.serve(async (req) => {
       .select("id, aula, data_chamada, periodo, criada_por")
       .eq("turma_id", turma.id)
       .eq("data_chamada", dataIso)
-      .eq("criada_por", professor.id)
       .lte("aula", aulaMax)
       .order("aula", { ascending: true });
 
