@@ -87,17 +87,17 @@ function parseDataDDMM(dataStr: string): string {
 
 function parseAulas(aulas: unknown): number[] {
   if (!Array.isArray(aulas)) {
-    throw new Error("O campo 'aulas' deve ser uma lista de números entre 1 e 7.");
+    throw new Error("O campo 'aulas' deve ser uma lista de números entre 1 e 6.");
   }
 
   const lista = aulas
     .map((a) => Number(a))
-    .filter((a) => Number.isInteger(a) && a >= 1 && a <= 7);
+    .filter((a) => Number.isInteger(a) && a >= 1 && a <= 6);
 
   const unicas = Array.from(new Set(lista)).sort((a, b) => a - b);
 
   if (unicas.length === 0) {
-    throw new Error("Informe ao menos uma aula válida entre 1 e 7.");
+    throw new Error("Informe ao menos uma aula válida entre 1 e 6.");
   }
 
   return unicas;

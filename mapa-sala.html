@@ -321,7 +321,6 @@
           <button type="button" data-aula="4">4</button>
           <button type="button" data-aula="5">5</button>
           <button type="button" data-aula="6">6</button>
-          <button type="button" data-aula="7">7</button>
         </div>
       </div>
     </div>
@@ -340,7 +339,6 @@
         <option value="4">Aula 4</option>
         <option value="5">Aula 5</option>
         <option value="6">Aula 6</option>
-        <option value="7">Aula 7</option>
       </select>
     </div>
 
@@ -656,7 +654,7 @@
 
       if (aulaUrl) {
         const aulaNumero = parseInt(aulaUrl, 10);
-        if (aulaNumero >= 1 && aulaNumero <= 7) {
+        if (aulaNumero >= 1 && aulaNumero <= 6) {
           aulaChamadaSelect.value = String(aulaNumero);
         }
       }
