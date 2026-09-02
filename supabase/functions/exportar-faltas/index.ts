@@ -251,96 +251,45 @@ Deno.serve(async (req) => {
       }
 
       const chamadasLista = chamadasHoje || [];
+      const minhasChamadas = chamadasLista.filter((c) => c.criada_por === auth.userId);
 
-      if (chamadasLista.length === 0) {
-        return respostaJson({
-          ok: true,
-          modo: modoStr,
-          data: dataIsoAlvo,
-          resultado: [],
-        });
+      // --- FILTRO POR PROFESSOR + HERANÇA VIA GRADE ---
+      const targetDow = new Date(dataIsoAlvo + "T12:00:00Z").getUTCDay();
+
+      // 1. Buscar a grade oficial do professor para o dia solicitado
+      const { data: gradeRaw, error: erroGrade } = await admin
+        .from("propriedade_horario")
+        .select("turma_id, periodo, aula")
+        .eq("professor_id", auth.userId)
+        .eq("dia_semana", targetDow);
+
+      if (erroGrade) {
+        return erro("erro_consulta", "Erro ao carregar a grade do professor.", 500);
       }
 
-      // --- FILTRO POR PROFESSOR + HERANÇA ---
-      // Separar chamadas do professor autenticado
-      const minhasChamadas = chamadasLista.filter(
-        (c) => c.criada_por === auth.userId,
-      );
-
-      // Turma IDs onde o professor já tem chamada própria hoje
-      const turmaIdsComChamadaPropria = new Set(
-        minhasChamadas.map((c) => c.turma_id),
-      );
-
-      // Turma IDs do dia onde o professor NÃO fez chamada
-      const turmaIdsSemChamadaPropria = [
-        ...new Set(
-          chamadasLista
-            .filter((c) => !turmaIdsComChamadaPropria.has(c.turma_id))
-            .map((c) => c.turma_id),
-        ),
-      ];
-
-      // Buscar histórico do professor para herança em turmas sem chamada própria
+      const gradeHoje = gradeRaw || [];
       // deno-lint-ignore no-explicit-any
-      let chamadasVirtuais: any[] = [];
+      const chamadasVirtuais: any[] = [];
 
-      if (turmaIdsSemChamadaPropria.length > 0) {
-        const { data: historicoRaw } = await admin
-          .from("chamadas")
-          .select("turma_id, periodo, aula, data_chamada")
-          .eq("criada_por", auth.userId)
-          .in("turma_id", turmaIdsSemChamadaPropria)
-          .order("data_chamada", { ascending: false })
-          .limit(200);
+      // 2. Para cada aula na grade, se não houver chamada real, cria uma virtual
+      for (const slot of gradeHoje) {
+        const jaFezChamada = minhasChamadas.some(
+          (c) => c.turma_id === slot.turma_id && c.aula === slot.aula
+        );
 
-        const historico = historicoRaw || [];
-
-        if (historico.length > 0) {
-          // Dia da semana alvo para preferir o mesmo dia no histórico
-          const targetDow = new Date(dataIsoAlvo + "T12:00:00Z").getUTCDay();
-
-          for (const tid of turmaIdsSemChamadaPropria) {
-            const destaTurma = historico.filter((h) => h.turma_id === tid);
-            if (destaTurma.length === 0) continue;
-
-            // Só considerar chamadas do mesmo dia da semana
-            const mesmoDow = destaTurma.filter(
-              (h) =>
-                new Date(h.data_chamada + "T12:00:00Z").getUTCDay() ===
-                targetDow,
-            );
-            // Se não há histórico neste dia da semana, o professor não dá aula aqui neste dia
-            if (mesmoDow.length === 0) continue;
-            const fonte = mesmoDow;
-
-            // Usar as aulas da data mais recente encontrada
-            const dataRef = fonte[0].data_chamada;
-            const aulasNaData = fonte.filter(
-              (h) => h.data_chamada === dataRef,
-            );
-
-            // Deduplicar por aula
-            const aulasVistas = new Set<number>();
-            for (const h of aulasNaData) {
-              const aula = h.aula as number;
-              if (aulasVistas.has(aula)) continue;
-              aulasVistas.add(aula);
-
-              chamadasVirtuais.push({
-                id: `virtual_${h.turma_id}_${aula}`,
-                turma_id: h.turma_id,
-                data_chamada: dataIsoAlvo,
-                periodo: h.periodo,
-                aula: aula,
-                criada_por: auth.userId,
-              });
-            }
-          }
+        if (!jaFezChamada) {
+          chamadasVirtuais.push({
+            id: `virtual_${slot.turma_id}_${slot.aula}`,
+            turma_id: slot.turma_id,
+            data_chamada: dataIsoAlvo,
+            periodo: slot.periodo,
+            aula: slot.aula,
+            criada_por: auth.userId,
+          });
         }
       }
 
-      // Resultado final: chamadas próprias + virtuais (herança)
+      // Resultado final a ser processado (chamadas reais + virtuais da grade)
       const chamadasParaResultado = [...minhasChamadas, ...chamadasVirtuais];
 
       if (chamadasParaResultado.length === 0) {
@@ -351,9 +300,10 @@ Deno.serve(async (req) => {
           resultado: [],
         });
       }
-      // --- FIM FILTRO POR PROFESSOR ---
+      // --- FIM FILTRO E HERANÇA ---
 
-      const turmaIds = Array.from(new Set(chamadasLista.map((c) => c.turma_id)));
+      const todasAsChamadasRelevantes = [...chamadasLista, ...chamadasParaResultado];
+      const turmaIds = Array.from(new Set(todasAsChamadasRelevantes.map((c) => c.turma_id)));
 
       const { data: turmasInfo, error: erroTurmasInfo } = await admin
         .from("turmas")
